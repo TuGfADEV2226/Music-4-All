@@ -47,6 +47,10 @@ services:
       # uvicorn, genera otra clave y deja los tokens guardados indescifrables — la
       # sesión de app sigue viva pero Tidal responde 401 y la web dice "expirada".
       - SESSION_ENCRYPTION_KEY=${SESSION_ENCRYPTION_KEY:-}
+      # Web Push (PWA P1-C) — VAPID. Del .env de la raíz; vacías = push desactivado.
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:admin@example.com}
       # uv uses copy mode because the bind-mount is a cross-filesystem Windows volume
       - UV_LINK_MODE=copy
     volumes:
