@@ -46,3 +46,70 @@ El push está **feature-flagged**: desactivado hasta configurar claves VAPID.
   posterior; requiere generar binarios desde el SVG.
 - **P2 (no hecho)**: reproducción offline de descargas (IndexedDB/Cache) — opcional.
 - **CSP**: `worker-src 'self'` y `manifest-src 'self'` añadidos en la CSP de nginx.
+
+## Verificación en vivo del push (paso a paso)
+
+El push solo se puede probar **en modo producción**: el service worker no se
+registra en `next dev` (para no servir código viejo). El camino más fiable en local
+es **backend en Docker + frontend compilado en producción**.
+
+### 0. Requisitos (una sola vez)
+
+- Claves VAPID en el `.env` de la raíz (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+  `VAPID_SUBJECT=mailto:...`). Comprobar que el backend las ve:
+
+  ```bash
+  cd backend && uv run python -c "from app.config import settings; print('push_enabled =', settings.push_enabled)"
+  ```
+
+  Debe imprimir `push_enabled = True`.
+
+### 1. Levantar el backend (con sus dependencias) en Docker
+
+```bash
+docker compose up -d backend      # arrastra postgres + valkey; reenvía VAPID_* desde el .env
+docker compose ps                 # backend debe quedar (healthy)
+```
+
+### 2. Compilar y arrancar el frontend en producción
+
+En una terminal aparte (no se levanta el frontend de Docker, para no chocar con el
+`.next` del bind-mount):
+
+```powershell
+cd frontend
+$env:NEXT_PUBLIC_WS_URL = "ws://localhost:8000"   # progreso en vivo contra el backend Docker
+pnpm build
+pnpm start                                         # http://localhost:3000 en modo produccion
+```
+
+> `localhost` es contexto seguro, así que el service worker **sí** se registra aquí.
+
+### 3. Suscribirse y disparar la notificación
+
+1. Abre **http://localhost:3000** e inicia sesión con Tidal.
+2. **Ajustes → "Download notifications"**: activa el toggle → el navegador pide permiso
+   → al aceptar, se suscribe (`POST /push/subscribe`). En DevTools → Application →
+   Service Workers debe verse `sw.js` **activated**.
+3. Encola una **descarga**. Al completarse, el worker envía el push al dueño y aparece
+   la **notificación del sistema** "descarga lista".
+
+### Comprobaciones y problemas frecuentes
+
+- **No aparece el toggle** (o dice "Install the app…"): el SW no se registró → estás en
+  dev en vez de `build && start`, o el navegador no soporta SW.
+- **`/push/public-key` devuelve `enabled: false`**: faltan claves VAPID en el entorno
+  del backend (revisar `.env` raíz + reenvío en `docker-compose.yml`).
+- **No llega la notificación**: confirma que la descarga completó; mira logs del backend
+  (métrica `push_notifications_total`; las suscripciones muertas se purgan con 404/410);
+  revisa que concediste el permiso del navegador para el sitio.
+- **iOS**: solo funciona en la PWA **instalada** (Add to Home Screen, iOS 16.4+) y la
+  suscripción puede caducar sola.
+
+### Alternativa: stack completo en producción (Docker)
+
+Para validar también nginx/observabilidad en prod, hay que correr los targets
+`production` de los Dockerfiles (backend `--workers 1`, frontend standalone). Hoy
+`docker-compose.yml` usa `target: development`; un override `docker-compose.prod.yml`
+que cambie ambos targets (y retire los bind-mounts de código) queda pendiente para el
+despliegue público — no es necesario para esta verificación de push.
