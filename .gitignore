@@ -36,6 +36,10 @@ npm-debug.log
 yarn-error.log
 pnpm-debug.log
 dist/
+# Artefactos de pnpm en la RAÍZ del repo: el proyecto Node vive en frontend/, así que
+# un package.json/lockfile en la raíz es basura de correr pnpm en el sitio equivocado.
+/package.json
+/pnpm-lock.yaml
 
 # Next.js
 .next/
