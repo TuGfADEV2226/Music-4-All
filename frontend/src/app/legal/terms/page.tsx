@@ -14,7 +14,7 @@ export default function TermsPage() {
         <h2>1. Acceptance of these terms</h2>
         <p>
           By accessing or using Music 4 All (the &ldquo;Service&rdquo;), operated by{' '}
-          <strong>[OPERATOR NAME]</strong> (&ldquo;we&rdquo;, &ldquo;us&rdquo;), you agree to be
+          <strong>TuGfA</strong> (&ldquo;we&rdquo;, &ldquo;us&rdquo;), you agree to be
           bound by these Terms of Service. If you do not agree, do not use the Service.
         </p>
       </section>
@@ -102,7 +102,8 @@ export default function TermsPage() {
       <section>
         <h2>9. Contact</h2>
         <p>
-          Questions about these terms: <strong>[CONTACT EMAIL]</strong>.
+          Questions about these terms:{' '}
+          <a href="mailto:twittersno45@gmail.com">twittersno45@gmail.com</a>.
         </p>
       </section>
     </LegalDocument>

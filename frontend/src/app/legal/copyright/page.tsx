@@ -37,9 +37,11 @@ export default function CopyrightPage() {
           copyright you own or control, send a written notice to our designated agent:
         </p>
         <ul>
-          <li><strong>Designated agent:</strong> [AGENT NAME]</li>
-          <li><strong>Email:</strong> [DMCA EMAIL]</li>
-          <li><strong>Postal address:</strong> [POSTAL ADDRESS]</li>
+          <li><strong>Designated agent:</strong> TuGfA</li>
+          <li>
+            <strong>Email:</strong>{' '}
+            <a href="mailto:twittersno45@gmail.com">twittersno45@gmail.com</a>
+          </li>
         </ul>
         <p>Your notice must include:</p>
         <ul>

@@ -1,7 +1,9 @@
 # Legal (Fase 6 — hardening público)
 
-> **Estos documentos son PLANTILLAS, no asesoría legal.** Antes de abrir la web al
-> público, revísalos con un asesor legal y **rellena todos los `[placeholders]`**.
+> **Origen: plantillas genéricas, no asesoría legal.** El texto no ha sido revisado
+> por un abogado. Los `[placeholders]` YA están rellenados con los datos del operador
+> y el banner de "plantilla" fue retirado (ver más abajo). Si en algún momento pasa
+> por revisión legal, actualiza el texto en consecuencia.
 
 ## Dónde vive el texto legal
 
@@ -22,14 +24,20 @@ Puntos de entrada del usuario:
 - **Login** (`features/auth/ui/LoginForm.tsx`): aviso "al conectar aceptas…" + enlaces.
 - **Ajustes** (`app/(app)/settings/page.tsx`): tarjeta "Legal & about".
 
-## Placeholders a rellenar antes de publicar
+## Datos del operador (placeholders ya rellenados)
 
-- `[OPERATOR NAME]` — quién opera el servicio (Términos).
-- `[CONTACT EMAIL]` — contacto general (Términos).
-- `[AGENT NAME]`, `[DMCA EMAIL]`, `[POSTAL ADDRESS]` — agente designado DMCA (Copyright).
+Servicio operado por una sola persona; todos los "roles" legales recaen en ella:
 
-Cada página muestra un banner amarillo recordando que es una plantilla; **quítalo**
-(editando `LegalDocument`) cuando el texto esté revisado y aprobado.
+- **Operador / agente DMCA:** `TuGfA` (alias) — Términos §1 y Copyright §3.
+- **Contacto general y DMCA:** `twittersno45@gmail.com` — Términos §9 y Copyright §3.
+- **Dirección postal:** omitida a propósito (contacto DMCA **solo por email**). Si se
+  quiere una dirección contactable sin exponer el domicilio, añadir un apartado de
+  correos como línea `Postal address:` en `copyright/page.tsx`.
+
+El banner amarillo "Template — not legal advice" de `LegalDocument.tsx` fue
+**retirado**: estaba pensado para el estado previo a publicar y no debe mostrarse en
+una web ya publicada. Las cláusulas que protegen al operador ("as is", sin garantías,
+limitación de responsabilidad, no afiliación a Tidal) siguen dentro del propio texto.
 
 ## Divulgación del riesgo de revocación del `client_id`
 

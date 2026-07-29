@@ -9,22 +9,30 @@ import DisclaimerPage from '@/app/legal/disclaimer/page'
 // servidor): usan LegalDocument + anclas planas, así que renderizan en jsdom.
 
 describe('legal documents', () => {
-  it('Terms renders with the template banner and acceptable-use section', () => {
+  it('Terms names the operator, an acceptable-use section, and a contact email', () => {
     render(<TermsPage />)
     expect(
       screen.getByRole('heading', { level: 1, name: /terms of service/i })
     ).toBeVisible()
-    // Cada documento debe advertir que es una plantilla, no asesoría legal.
-    expect(screen.getByText(/not legal advice/i)).toBeVisible()
+    // Placeholders rellenados: el operador y el contacto reales deben aparecer.
+    expect(screen.getByText('TuGfA')).toBeVisible()
     expect(screen.getByRole('heading', { name: /acceptable use/i })).toBeVisible()
+    expect(
+      screen.getByRole('link', { name: /twittersno45@gmail\.com/i })
+    ).toBeInTheDocument()
   })
 
-  it('Copyright includes DMCA takedown steps and a repeat-infringer policy', () => {
+  it('Copyright includes DMCA takedown steps, the designated agent, and a repeat-infringer policy', () => {
     render(<CopyrightPage />)
     expect(
       screen.getByRole('heading', { name: /copyright & dmca policy/i })
     ).toBeVisible()
     expect(screen.getByText(/takedown notice/i)).toBeInTheDocument()
+    // El agente DMCA designado (placeholders rellenados, contacto solo por email).
+    expect(screen.getByText('TuGfA')).toBeVisible()
+    expect(
+      screen.getByRole('link', { name: /twittersno45@gmail\.com/i })
+    ).toBeInTheDocument()
     expect(screen.getByText(/repeat-infringer/i)).toBeInTheDocument()
   })
 
