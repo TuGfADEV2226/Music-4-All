@@ -263,11 +263,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # `production`, no `builder`: compilar solo el builder dejaba sin probar el
+      # target que realmente se despliega, y así se coló una imagen de producción
+      # que ni siquiera podía construirse (le faltaba `output: 'standalone'`).
       - name: Build frontend image
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
-          target: builder
+          target: production
           push: false
           tags: music4all-frontend:${{ github.sha }}
           cache-from: type=gha

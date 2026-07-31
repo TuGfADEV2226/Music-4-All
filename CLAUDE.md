@@ -93,6 +93,8 @@ Detalle de cada comando, migraciones Alembic y convenciones: **`docs/development
 - **`docs/frontend/FRONTEND_VISION.md`** — visión creativa del rediseño "tienda de discos neón nocturna" (Login y Dashboard).
 - **`docs/frontend/IMPLEMENTATION_PLAN.md`** — roadmap por fases del rediseño visual, con riesgos técnicos identificados (WS singleton, persistencia, a11y, etc.).
 
+- **`docs/PRE_LAUNCH_REVIEW.md`** — resultado de la revisión pre-lanzamiento (Fase 0): qué se arregló, qué se decidió no hacer y por qué, con las cifras medidas. **Es la lectura que evita reauditar lo que ya está cerrado**; las auditorías de abajo son históricas.
+
 ### Auditorías (`docs/audits/`)
 
 - **`docs/audits/TECHNICAL_AUDIT.md`** — deuda técnica (TD-01 a TD-14): código huérfano, tests fallando, configuración no bloqueante en CI, rutas/navegación rotas, etc.

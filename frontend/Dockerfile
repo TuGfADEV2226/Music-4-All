@@ -17,6 +17,13 @@ CMD ["pnpm", "dev"]
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# `rewrites()` de next.config.mjs se evalúa durante `next build` y su resultado se
+# hornea en routes-manifest.json, así que BACKEND_URL tiene que estar definida
+# AQUÍ: pasarla como variable de entorno al contenedor ya no cambia nada. El
+# default apunta al servicio del compose, nunca a localhost (dentro del
+# contenedor no hay ningún backend escuchando ahí).
+ARG BACKEND_URL=http://backend:8000
+ENV BACKEND_URL=$BACKEND_URL
 RUN pnpm build
 
 FROM base AS production

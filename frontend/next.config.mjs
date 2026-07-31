@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // El target `production` del Dockerfile copia `.next/standalone`, que solo se
+  // genera con esta opción: sin ella la imagen de producción no se puede construir
+  // (y CI no lo detectaba porque solo compila el target `builder`).
+  output: 'standalone',
   async rewrites() {
+    // OJO: esto se evalúa en `next build`, no al arrancar. El destino queda
+    // horneado en routes-manifest.json, así que en la imagen de producción
+    // BACKEND_URL debe pasarse como build arg (ver frontend/Dockerfile).
     const backendUrl = process.env.BACKEND_URL ?? 'http://localhost:8000'
     return [
       {
