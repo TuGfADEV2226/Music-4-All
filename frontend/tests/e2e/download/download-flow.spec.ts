@@ -2,6 +2,7 @@ import { expect, test, type WebSocketRoute } from '@playwright/test'
 
 import { buildSearchResponse, TOXICITY_ALBUM_DTO } from '../fixtures/album'
 import { mockAuthenticatedSession } from '../utils/auth'
+import { fillGlobalSearch } from '../utils/search'
 
 /**
  * E2E — Download flow (`/dashboard` → DownloadPanel → `/history`).
@@ -57,10 +58,7 @@ test.describe('Download flow', () => {
 
     await page.goto('/dashboard')
 
-    const searchInput = page.getByRole('textbox', {
-      name: 'Search albums, tracks, or paste a Tidal URL',
-    })
-    await searchInput.fill('System of a Down')
+    await fillGlobalSearch(page, 'System of a Down')
 
     const albumCard = page.getByRole('article', {
       name: `${TOXICITY_ALBUM_DTO.title} by ${TOXICITY_ALBUM_DTO.artist.name}, 2001`,

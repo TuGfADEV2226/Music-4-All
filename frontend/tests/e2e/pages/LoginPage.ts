@@ -21,7 +21,9 @@ export class LoginPage {
 
   constructor(page: Page) {
     this.page = page
-    this.brandTitle = page.getByText('MUSIC 4 ALL')
+    // `exact` es necesario: el aviso legal del login y el <title> de la página
+    // también contienen "Music 4 All", y sin él el selector casa con 3 elementos.
+    this.brandTitle = page.getByText('MUSIC 4 ALL', { exact: true })
     this.heading = page.getByRole('heading', { name: 'Connect to Tidal' })
     this.connectButton = page.getByRole('button', {
       name: 'Connect with Tidal via Device Authorization',

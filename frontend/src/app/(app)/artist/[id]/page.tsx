@@ -6,6 +6,7 @@ import { ArtistClient } from './ArtistClient'
  * First dynamic route in the app. Delegates state/logic to ArtistClient
  * (client boundary), inheriting the authenticated (app) shell.
  */
-export default function ArtistPage({ params }: { params: { id: string } }) {
-  return <ArtistClient artistId={params.id} />
+export default async function ArtistPage(props: { params: Promise<{ id: string }> }) {
+  const { id } = await props.params
+  return <ArtistClient artistId={id} />
 }

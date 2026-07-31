@@ -2,9 +2,14 @@ import type { Page } from '@playwright/test'
 
 const AUTH_STORAGE_KEY = 'music4all-auth'
 
+// Must match `SESSION_COOKIE` in src/middleware.ts (and the backend's
+// `session_cookie_name`). It used to be the client-written `music4all_session`;
+// the multi-user work moved route protection to the backend's httpOnly cookie.
+const SESSION_COOKIE = 'm4a_sid'
+
 /**
  * Seeds the persisted auth.store (Zustand `persist` → localStorage) and the
- * `music4all_session` cookie so the app boots in an authenticated state
+ * session cookie so the app boots in an authenticated state
  * without going through the Tidal Device Authorization flow.
  *
  * The cookie is required by the Next.js middleware (src/middleware.ts) which
@@ -45,6 +50,6 @@ export async function mockAuthenticatedSession(page: Page): Promise<void> {
   // Set session cookie so middleware allows access to protected routes
   const cookieExpiry = Math.floor(Date.now() / 1000) + 7200
   await page.context().addCookies([
-    { name: 'music4all_session', value: '1', domain: 'localhost', path: '/', expires: cookieExpiry },
+    { name: SESSION_COOKIE, value: 'e2e-session', domain: 'localhost', path: '/', expires: cookieExpiry },
   ])
 }

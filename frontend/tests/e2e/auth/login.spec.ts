@@ -43,6 +43,13 @@ test.describe('Login — Tidal Device Authorization', () => {
       }
 
       await route.fulfill({
+        // El backend real emite aquí la cookie httpOnly de sesión, y el
+        // middleware la exige para dejar entrar a /dashboard: sin ella el
+        // redirect de vuelta a /login haría fallar la comprobación de abajo.
+        headers: {
+          'content-type': 'application/json',
+          'set-cookie': 'm4a_sid=e2e-session; Path=/; HttpOnly; SameSite=Lax',
+        },
         json: {
           status: 'authorized',
           user: {

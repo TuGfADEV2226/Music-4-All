@@ -43,7 +43,7 @@ const popoverV = {
 
 // ─── Focus trap helper (A-02) ─────────────────────────────────────────────────
 
-function useFocusTrap(ref: React.RefObject<HTMLElement>, active: boolean) {
+function useFocusTrap(ref: React.RefObject<HTMLElement | null>, active: boolean) {
   useEffect(() => {
     if (!active || !ref.current) return
     const el = ref.current

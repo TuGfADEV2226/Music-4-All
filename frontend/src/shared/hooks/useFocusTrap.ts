@@ -10,7 +10,9 @@ import { useEffect } from 'react'
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
-export function useFocusTrap(ref: React.RefObject<HTMLElement>, active: boolean) {
+// El ref admite `null` porque desde React 19 `useRef<T>(null)` se tipa como
+// `RefObject<T | null>`: el elemento no existe hasta que se monta.
+export function useFocusTrap(ref: React.RefObject<HTMLElement | null>, active: boolean) {
   useEffect(() => {
     if (!active || !ref.current) return
     const el = ref.current

@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 import { buildSearchResponse, TOXICITY_ALBUM_DTO } from './fixtures/album'
 import { mockAuthenticatedSession } from './utils/auth'
+import { hideNextDevOverlay } from './utils/devOverlay'
 
 /**
  * E2E — Accessibility (axe-core).
@@ -127,6 +128,12 @@ test.describe('Accessibility (axe) — no Critical/Serious violations', () => {
   })
 
   test('now playing (Walkman) overlay', async ({ page }) => {
+    // La vista expandida se abre desde la carátula de la PlayerBar, que solo
+    // existe en móvil: en lg+ el reproductor vive como Walkman en el sidebar
+    // (ver PlayerBar.tsx). Con el viewport por defecto (1280) no hay botón que
+    // pulsar, así que este caso se audita en la disposición donde existe.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await hideNextDevOverlay(page)
     await mockAuthenticatedSession(page)
     await page.routeWebSocket('**/ws/downloads', () => {})
     await page.route('**/api/artists/**', (route) => route.fulfill({ json: ARTIST_DETAIL }))

@@ -1,6 +1,7 @@
 import { chromium, type FullConfig } from '@playwright/test'
 
 import { buildSearchResponse, TOXICITY_ALBUM_DTO } from './fixtures/album'
+import { fillGlobalSearch } from './utils/search'
 
 const AUTH_STORAGE_KEY = 'music4all-auth'
 
@@ -67,11 +68,11 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     )
 
     // Set session cookie so middleware allows access to protected routes
-    // (middleware checks music4all_session before client-side auth.store can hydrate)
+    // (middleware checks `m4a_sid` before client-side auth.store can hydrate)
     const cookieExpiry = Math.floor(Date.now() / 1000) + 7200
     const baseHost = new URL(baseURL).hostname
     await page.context().addCookies([
-      { name: 'music4all_session', value: '1', domain: baseHost, path: '/', expires: cookieExpiry },
+      { name: 'm4a_sid', value: 'e2e-session', domain: baseHost, path: '/', expires: cookieExpiry },
     ])
 
     await page.route('**/api/search**', async (route) => {
@@ -81,10 +82,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
 
     await page.goto(`${baseURL}/dashboard`)
 
-    const searchInput = page.getByRole('textbox', {
-      name: 'Search albums, tracks, or paste a Tidal URL',
-    })
-    await searchInput.fill('System of a Down')
+    await fillGlobalSearch(page, 'System of a Down')
 
     const albumCard = page.getByRole('article', {
       name: `${TOXICITY_ALBUM_DTO.title} by ${TOXICITY_ALBUM_DTO.artist.name}, 2001`,

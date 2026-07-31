@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 
 import { buildSearchResponse, TOXICITY_ALBUM_DTO } from '../fixtures/album'
 import { mockAuthenticatedSession } from '../utils/auth'
+import { fillGlobalSearch } from '../utils/search'
 
 /**
  * E2E — Dashboard search (`/dashboard`).
@@ -27,11 +28,7 @@ test.describe('Dashboard search', () => {
 
     await page.goto('/dashboard')
 
-    const searchInput = page.getByRole('textbox', {
-      name: 'Search albums, tracks, or paste a Tidal URL',
-    })
-    await expect(searchInput).toBeVisible()
-    await searchInput.fill('System of a Down')
+    await fillGlobalSearch(page, 'System of a Down')
 
     const albumCard = page.getByRole('article', {
       name: `${TOXICITY_ALBUM_DTO.title} by ${TOXICITY_ALBUM_DTO.artist.name}, 2001`,
@@ -48,10 +45,7 @@ test.describe('Dashboard search', () => {
 
     await page.goto('/dashboard')
 
-    const searchInput = page.getByRole('textbox', {
-      name: 'Search albums, tracks, or paste a Tidal URL',
-    })
-    await searchInput.fill('a query with absolutely no matches')
+    await fillGlobalSearch(page, 'a query with absolutely no matches')
 
     await expect(page.getByRole('heading', { name: 'No results found' })).toBeVisible()
   })
@@ -85,10 +79,7 @@ test.describe('Dashboard search', () => {
 
     await page.goto('/dashboard')
 
-    const searchInput = page.getByRole('textbox', {
-      name: 'Search albums, tracks, or paste a Tidal URL',
-    })
-    await searchInput.fill('System of a Down')
+    await fillGlobalSearch(page, 'System of a Down')
 
     const albumCard = page.getByRole('article', {
       name: `${TOXICITY_ALBUM_DTO.title} by ${TOXICITY_ALBUM_DTO.artist.name}, 2001`,
