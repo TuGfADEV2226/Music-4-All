@@ -34,3 +34,13 @@ def test_development_is_not_production():
     assert s.is_production is False
     # En desarrollo el guard no se aplica, aunque la config tenga defaults inseguros.
     assert isinstance(s.production_config_errors(), list)
+
+
+def test_tracing_defaults_on_in_development_and_off_in_production():
+    assert Settings(environment="development").tracing_enabled is True
+    assert Settings(environment="production").tracing_enabled is False
+
+
+def test_tracing_can_be_forced_either_way():
+    assert Settings(environment="production", otel_tracing_enabled=True).tracing_enabled is True
+    assert Settings(environment="development", otel_tracing_enabled=False).tracing_enabled is False

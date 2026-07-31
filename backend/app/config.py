@@ -78,6 +78,20 @@ class Settings(BaseSettings):
     # PostgreSQL — SQLite solo en desarrollo local
     database_url: str = "sqlite+aiosqlite:///./dev.db"
 
+    # Tracing OpenTelemetry. El exportador configurado es la CONSOLA con
+    # SimpleSpanProcessor: exporta cada span de forma síncrona en el event loop e
+    # infla los logs, y sin collector no aporta nada en producción (PERF-01). Por
+    # eso el default es "activo en desarrollo, inactivo en producción"; None deja
+    # ese default y OTEL_TRACING_ENABLED=true/false lo fuerza explícitamente.
+    otel_tracing_enabled: bool | None = None
+
+    @property
+    def tracing_enabled(self) -> bool:
+        """Si se instala el TracerProvider e instrumenta FastAPI con OTel."""
+        if self.otel_tracing_enabled is not None:
+            return self.otel_tracing_enabled
+        return not self.is_production
+
     @property
     def push_enabled(self) -> bool:
         """El push solo está activo si hay par de claves VAPID configurado."""

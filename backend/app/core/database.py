@@ -8,6 +8,10 @@ engine = create_async_engine(
     settings.async_database_url,
     echo=settings.debug,
     future=True,
+    # Valida la conexión antes de entregarla del pool: tras un rato ocioso, Postgres
+    # (o un proxy/firewall intermedio) puede haber cerrado el socket y la primera
+    # consulta fallaría con un error intermitente en vez de reconectar (PERF-08).
+    pool_pre_ping=True,
 )
 
 AsyncSessionLocal = async_sessionmaker(

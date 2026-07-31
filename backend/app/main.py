@@ -198,8 +198,13 @@ Instrumentator(
 ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 # ── OpenTelemetry ─────────────────────────────────────────────────────────────
-_setup_tracing()
-FastAPIInstrumentor.instrument_app(app)
+# Desactivado en producción por defecto: el único exportador es la consola y va con
+# SimpleSpanProcessor (síncrono en el event loop). Ver `settings.tracing_enabled`.
+if settings.tracing_enabled:
+    _setup_tracing()
+    FastAPIInstrumentor.instrument_app(app)
+else:
+    logger.info("OpenTelemetry tracing deshabilitado", extra={"environment": settings.environment})
 
 
 # ── Handler global de ApiException (produce {"error": {...}}) ─────────────────
