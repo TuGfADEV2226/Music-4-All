@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { Download, Music, Play } from 'lucide-react'
 
+import { coverAtSize } from '@/shared/api/mappers'
 import { cn } from '@/shared/lib/cn'
 import { formatDuration } from '@/shared/lib/format'
 import type { Track } from '@/entities'
@@ -57,7 +58,13 @@ export function TrackResults({
                 className="relative h-10 w-10 shrink-0 overflow-hidden rounded bg-surface-rack"
               >
                 {track.coverUrl ? (
-                  <Image src={track.coverUrl} alt="" width={40} height={40} className="h-full w-full object-cover" />
+                  <Image
+                    src={coverAtSize(track.coverUrl, 160)}
+                    alt=""
+                    width={40}
+                    height={40}
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   <Music className="absolute inset-0 m-auto h-4 w-4 text-disabled" />
                 )}

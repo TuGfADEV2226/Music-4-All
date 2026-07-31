@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { Music } from 'lucide-react'
 
+import { coverAtSize } from '@/shared/api/mappers'
 import { Modal } from '@/shared/ui/Modal'
 
 import type { LibraryAlbum } from './groupAlbums'
@@ -53,7 +54,13 @@ export function AlbumTracksModal({
           <div className="flex gap-4">
             <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-subtle bg-surface-studio">
               {album.coverUrl ? (
-                <Image src={album.coverUrl} alt="" fill sizes="80px" className="object-cover" />
+                <Image
+                  src={coverAtSize(album.coverUrl, 320)}
+                  alt=""
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                />
               ) : (
                 <span
                   className="flex h-full w-full items-center justify-center text-disabled"

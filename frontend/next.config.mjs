@@ -13,6 +13,13 @@ const nextConfig = {
       // (ver shared/config/ws.config.ts); en producción nginx proxea /ws/ al backend.
     ]
   },
+  // Optimizador de imágenes DESACTIVADO a propósito (evaluado en la Fase 0.B).
+  // Las carátulas vienen del CDN de Tidal, que ya sirve tallas pre-renderizadas
+  // (80/160/320/640/750/1080/1280) y las entrega directamente al navegador.
+  // Activar `next/image` las haría pasar por nuestro servidor: CPU de redimensionado,
+  // ancho de banda de salida y caché en disco en una VM gratuita, para reempaquetar
+  // algo que el CDN ya da optimizado. En su lugar cada componente pide la talla que
+  // necesita con `coverAtSize()` (shared/api/mappers.ts), que no nos cuesta nada.
   images: {
     unoptimized: true,
   },

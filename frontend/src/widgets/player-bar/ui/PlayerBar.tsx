@@ -16,6 +16,7 @@ import {
   Volume2,
 } from 'lucide-react'
 
+import { coverAtSize } from '@/shared/api/mappers'
 import { cn } from '@/shared/lib/cn'
 import { formatDuration } from '@/shared/lib/format'
 import { useReducedMotion } from '@/shared/hooks/useReducedMotion'
@@ -140,7 +141,7 @@ export function PlayerBar() {
       >
         {current?.coverUrl ? (
           <Image
-            src={current.coverUrl}
+            src={coverAtSize(current.coverUrl, 160)}
             alt=""
             width={48}
             height={48}

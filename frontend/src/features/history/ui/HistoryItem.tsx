@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import { Music } from 'lucide-react'
 
+import { coverAtSize } from '@/shared/api/mappers'
 import { cn } from '@/shared/lib/cn'
 import type { HistoryRecord } from '../model/history.types'
 
@@ -49,7 +50,7 @@ export function HistoryItem({ record }: HistoryItemProps) {
       >
         {record.coverUrl ? (
           <Image
-            src={record.coverUrl}
+            src={coverAtSize(record.coverUrl, 160)}
             alt={`Cover for ${record.title}`}
             fill
             sizes="48px"
