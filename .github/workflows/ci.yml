@@ -98,6 +98,12 @@ jobs:
       - name: Run unit tests
         run: pnpm test
 
+      # Mismo criterio que pip-audit en el backend: informativo, no bloqueante.
+      # `--prod` deja fuera el toolchain de desarrollo, que no se despliega.
+      - name: pnpm audit — CVEs de dependencias (informativo)
+        continue-on-error: true
+        run: pnpm audit --prod
+
   # ── Frontend: E2E tests (Playwright, mocked backend) ────────────────────
   test-e2e:
     name: "Frontend — E2E Tests (Playwright)"
@@ -218,6 +224,15 @@ jobs:
 
       - name: Bandit — security scan
         run: uv run bandit -r app/ -ll -f json -o bandit-report.json || [ $? -eq 0 ]
+
+      # CVEs de las dependencias (SEC-05). Informativo a propósito: un aviso nuevo
+      # publicado aguas arriba no debe bloquear un PR que no lo toca, pero tiene que
+      # verse. Quien mergea lo revisa; Dependabot abre el PR de actualización.
+      - name: pip-audit — CVEs de dependencias (informativo)
+        continue-on-error: true
+        run: |
+          uv export --format requirements-txt --no-emit-project --no-dev --no-hashes -o requirements-audit.txt
+          uvx pip-audit --requirement requirements-audit.txt --no-deps
 
       - name: Upload bandit report
         uses: actions/upload-artifact@v4

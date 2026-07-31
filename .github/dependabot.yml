@@ -1,0 +1,56 @@
+# Actualizaciones de dependencias (SEC-05: hasta ahora nada vigilaba los CVE de
+# las dependencias). Los parches y menores van agrupados en un solo PR semanal
+# para que revisarlos no sea un trabajo diario; los mayores llegan sueltos porque
+# suelen necesitar intervención manual.
+version: 2
+updates:
+  # ── Backend (uv: pyproject.toml + uv.lock) ─────────────────────────────────
+  - package-ecosystem: "uv"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      backend-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # ── Frontend (pnpm) ────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      frontend-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # ── Workflows de CI ────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # ── Imágenes base de los contenedores ──────────────────────────────────────
+  - package-ecosystem: "docker"
+    directories:
+      - "/backend"
+      - "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(docker)"

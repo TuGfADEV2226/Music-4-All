@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Request, Response
 
 from app.config import settings
+from app.core.csrf import assert_not_cross_site
 from app.core.exceptions import ApiException
 from app.core.rate_limiter import limiter
 from app.dependencies import CurrentUser, get_current_user, get_current_user_optional
@@ -65,7 +66,11 @@ async def poll_device_auth(
     """Polling de autorización durante el Device Auth flow. Llamar cada `interval` segundos.
 
     Al autorizarse, emite la cookie httpOnly de sesión de app (Set-Cookie en `response`).
+    Por eso exige que la petición no sea cross-site: es el único endpoint que crea
+    sesión sin tener una, y SameSite=Lax no impide *fijar* la cookie desde fuera
+    (login CSRF; ver `app/core/csrf.py`).
     """
+    assert_not_cross_site(request)
     try:
         result = await _service.poll_device_auth(device_code, request, response)
     except ApiException:
