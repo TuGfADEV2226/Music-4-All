@@ -196,7 +196,7 @@ export function PlayerBar() {
           </>
         ) : (
           <p
-            className="flex items-center gap-2 font-sans text-sm text-disabled"
+            className="flex items-center gap-2 font-sans text-sm text-secondary"
             aria-live="polite"
           >
             <CircleSlash aria-hidden="true" className="h-4 w-4" />

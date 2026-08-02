@@ -60,10 +60,10 @@ Estado de pendientes, deuda técnica, mejoras futuras y riesgos conocidos, basad
 ### 2.7 `SECRET_KEY` con valor default
 - `.env.example` define `SECRET_KEY=change-me-in-production` — verificar que cualquier despliegue real sobreescriba este valor (no se ha confirmado dónde se usa actualmente `SECRET_KEY` en el código de la app).
 
-### 2.8 Contraste WCAG AA del texto tenue (`text-disabled`)
-- El gate de accesibilidad (`frontend/tests/e2e/a11y.spec.ts`, axe-core) falla ante violaciones Critical/Serious **excepto `color-contrast`**, que se ejecuta y se reporta como advertencia pero **no bloquea** (deuda rastreada).
-- Causa: el token `text-disabled` (#4D6278) usado para texto de baja jerarquía (email en el sidebar, año del álbum, etiquetas "M4A · Sound"/"Now Playing", tiempos) no alcanza 4.5:1 sobre las superficies oscuras (~2.5–3.1:1). Subirlo a AA en todas las superficies (incl. `surface-studio` de los modales) exige aclararlo casi hasta `text-secondary` (#8FA3B8), achatando la jerarquía de 3 niveles del look "neón moribundo".
-- Remediación propuesta (tarea de diseño dedicada): reclasificar a `text-secondary` el texto informativo que debe leerse y reservar `text-disabled` para controles realmente inactivos (exentos por WCAG 1.4.3), o redefinir la rampa de texto del design system con contraste AA. Al cerrarse, quitar `color-contrast` de `TRACKED_DEBT_RULES` en el spec.
+### 2.8 Contraste WCAG AA del texto tenue (`text-disabled`) — ~~DEUDA~~ **RESUELTO (Fase 0.E, 2026-08-01)**
+- `TRACKED_DEBT_RULES` está **vacío**: el gate de axe ya bloquea ante `color-contrast` como ante cualquier otra violación Critical/Serious, en **9 vistas** (antes 5).
+- Se aplicó la remediación propuesta: el texto informativo pasó a `text-secondary` (5.2–7.6:1) y `text-disabled` (#4D6278, 2.1–3.1:1) queda solo para iconos decorativos y controles inactivos, exentos por WCAG 1.4.3. El token **no** se aclaró, así que la jerarquía de tres niveles sigue intacta.
+- Al quitar la excepción salió un segundo fallo que tapaba: los tokens semánticos `error`/`info`/`queue` como **texto** dan 3.0–3.7:1. Se añadió la variante `-on-dark` (solo para glifos; los rellenos, bordes y puntos conservan el color original). Detalle y cifras en `docs/PRE_LAUNCH_REVIEW.md` §0.E.
 
 ---
 

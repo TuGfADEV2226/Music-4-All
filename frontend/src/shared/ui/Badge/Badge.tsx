@@ -28,11 +28,11 @@ const VARIANTS: Record<BadgeVariant, string> = {
   default:      'border text-secondary',
   format:       'border border-teal-500 text-teal-300 bg-transparent',
   quality:      'border border-teal-500 bg-teal-500/15 text-teal-400',
-  'status-ok':  'bg-semantic-success/15 text-semantic-success',
-  'status-error': 'bg-semantic-error/15 text-semantic-error',
-  'status-warn':  'bg-semantic-warning/15 text-semantic-warning',
-  'status-info':  'bg-semantic-info/15 text-semantic-info',
-  'status-queue': 'bg-semantic-queue/15 text-semantic-queue',
+  'status-ok':  'bg-semantic-success/15 text-semantic-success-on-dark',
+  'status-error': 'bg-semantic-error/15 text-semantic-error-on-dark',
+  'status-warn':  'bg-semantic-warning/15 text-semantic-warning-on-dark',
+  'status-info':  'bg-semantic-info/15 text-semantic-info-on-dark',
+  'status-queue': 'bg-semantic-queue/15 text-semantic-queue-on-dark',
 }
 
 const DOT_COLORS: Partial<Record<BadgeVariant, string>> = {

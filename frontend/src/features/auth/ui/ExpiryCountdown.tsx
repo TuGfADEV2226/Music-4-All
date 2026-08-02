@@ -37,7 +37,7 @@ export function ExpiryCountdown({ issuedAt, expiresIn, className }: ExpiryCountd
       aria-hidden="true"
       className={cn(
         'font-retro text-lg tabular-nums',
-        expired ? 'text-semantic-error' : 'text-teal-300',
+        expired ? 'text-semantic-error-on-dark' : 'text-teal-300',
         className
       )}
       style={expired ? undefined : { textShadow: '0 0 6px var(--color-teal-300)' }}

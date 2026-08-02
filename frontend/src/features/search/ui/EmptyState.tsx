@@ -71,7 +71,7 @@ export function EmptyState({ variant, query, onRetry }: EmptyStateProps) {
         aria-hidden="true"
         className={cn(
           'mb-4 h-12 w-12',
-          variant === 'error'    && 'text-semantic-error',
+          variant === 'error'    && 'text-semantic-error-on-dark',
           variant === 'initial'  && 'text-disabled',
           variant === 'no-results' && 'text-disabled',
         )}

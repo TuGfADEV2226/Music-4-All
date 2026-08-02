@@ -39,18 +39,40 @@ El repositorio ya tiene **dos generaciones de tokens de color**:
 | | `surface-rack` | `#21303F` | Tracks de ProgressBar, hover de Card |
 | B — Texto | `text-primary` | `#E8EFF5` | Texto principal |
 | | `text-secondary` | `#8FA3B8` | Texto secundario (artista, metadatos) |
-| | `text-disabled` | `#4D6278` | Placeholders, iconos inactivos |
+| | `text-disabled` | `#4D6278` | **Solo** iconos decorativos y controles inactivos — ver §2.1.1 |
 | | `text-ghost` | `#2C3E50` | Texto casi invisible |
 | C — Acento Teal | `teal-300` | `#4DFFD9` | Acento brillante (hover fuerte) |
 | | `teal-400` | `#00E5BF` | Hover de elementos primarios |
 | | `teal-500` | `#00C9A7` | Acento principal (branding, focus, botón primario) |
 | | `teal-700` | `#008C73` | Variante oscura |
 | | `teal-glow` | `#00C9A720` | Glow translúcido |
-| D — Semántica | `semantic-success` | `#39D353` | Descarga completada |
+| D — Semántica (relleno) | `semantic-success` | `#39D353` | Descarga completada |
 | | `semantic-warning` | `#E8A020` | En cola / advertencia |
 | | `semantic-error` | `#E84040` | Error |
 | | `semantic-info` | `#3B82F6` | Descarga en progreso |
 | | `semantic-queue` | `#8B5CF6` | Estado "queued" |
+| D' — Semántica (texto) | `semantic-error-on-dark` | `#EF7D7D` | El mismo error, **como glifo** — ver §2.1.1 |
+| | `semantic-info-on-dark` | `#72A5F9` | idem |
+| | `semantic-queue-on-dark` | `#B192F9` | idem |
+| | `semantic-success-on-dark` | `#39D353` | Igual al base (ya cumple AA) |
+| | `semantic-warning-on-dark` | `#E8A020` | Igual al base (ya cumple AA) |
+
+### 2.1.1 Regla de contraste (WCAG AA) — qué token va en el texto
+
+Fijada en la Fase 0.E; el gate de axe (`tests/e2e/a11y.spec.ts`) la hace cumplir
+en 9 vistas, sin excepciones.
+
+- **`text-disabled` (#4D6278) no se usa para texto que haya que leer.** Da
+  2.1–3.1:1 sobre las superficies, muy por debajo del 4.5:1 de AA. Queda para
+  iconos decorativos (`aria-hidden`) y estados `disabled:` de controles
+  inactivos, que **WCAG 1.4.3 exime**. Para texto informativo de baja jerarquía
+  se usa `text-secondary` (5.2–7.6:1).
+  *No* se aclara el token: subirlo a AA lo dejaría casi en `text-secondary` y
+  aplanaría la rampa de tres niveles.
+- **Los colores semánticos, cuando son texto, van en su variante `-on-dark`.**
+  Los del grupo D están pensados como relleno (barras, puntos, bordes, fondos
+  teñidos al 15 %) y como glifos se quedan en 3.0–3.7:1. Los rellenos **no**
+  cambian: aclararlos deslavaría la barra de progreso y los indicadores.
 | E — Bordes | `border` (DEFAULT) | `#1E2D3D` | Borde estándar |
 | | `border-subtle` | `#162030` | Separadores |
 | | `border-focus` | `#00C9A750` | Focus ring |

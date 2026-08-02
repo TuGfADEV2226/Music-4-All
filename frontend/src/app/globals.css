@@ -43,6 +43,15 @@
   --color-info:    #3B82F6;
   --color-queue:   #8B5CF6;
 
+  /* Variante para TEXTO sobre superficies oscuras (WCAG AA 4.5:1). Los de
+     arriba son colores de relleno: como glifos se quedan en 3.0-3.7:1. Ver
+     el bloque `semantic` de tailwind.config.ts. */
+  --color-success-on-dark: #39D353;
+  --color-warning-on-dark: #E8A020;
+  --color-error-on-dark:   #EF7D7D;
+  --color-info-on-dark:    #72A5F9;
+  --color-queue-on-dark:   #B192F9;
+
   /* ── Grupo E: Bordes ───────────────────────────────────────────────────── */
   --color-border-default: #1E2D3D;
   --color-border-subtle:  #162030;

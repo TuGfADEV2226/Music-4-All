@@ -129,7 +129,7 @@ export function NowPlaying({ open, onClose }: NowPlayingProps) {
             M4A · Sound
           </span>
           <div className="flex items-center gap-3">
-            <span className="font-mono text-2xs uppercase tracking-widest text-disabled">
+            <span className="font-mono text-2xs uppercase tracking-widest text-secondary">
               Now Playing
             </span>
             <button

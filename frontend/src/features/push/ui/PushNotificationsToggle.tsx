@@ -37,7 +37,7 @@ export function PushNotificationsToggle() {
                 ? 'Get a push notification on this device when a download finishes.'
                 : 'Install the app to enable download notifications.'}
             </p>
-            {error && <p className="mt-1 font-sans text-xs text-semantic-error">{error}</p>}
+            {error && <p className="mt-1 font-sans text-xs text-semantic-error-on-dark">{error}</p>}
           </div>
         </div>
 

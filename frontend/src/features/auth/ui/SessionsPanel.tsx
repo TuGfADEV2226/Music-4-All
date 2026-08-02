@@ -158,8 +158,8 @@ export function SessionsPanel() {
 
         {isError && !isLoading && (
           <div role="alert" className="flex items-center gap-3 py-2">
-            <CircleAlert className="h-5 w-5 shrink-0 text-semantic-error" aria-hidden="true" />
-            <p className="font-sans text-sm text-semantic-error">
+            <CircleAlert className="h-5 w-5 shrink-0 text-semantic-error-on-dark" aria-hidden="true" />
+            <p className="font-sans text-sm text-semantic-error-on-dark">
               Couldn&apos;t load your sessions.
             </p>
             <Button type="button" variant="ghost" size="sm" onClick={() => void refetch()}>

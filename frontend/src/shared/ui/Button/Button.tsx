@@ -50,7 +50,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   ].join(' '),
 
   danger: [
-    'bg-transparent border border-semantic-error text-semantic-error',
+    'bg-transparent border border-semantic-error text-semantic-error-on-dark',
     'hover:bg-semantic-error/10',
     'focus-visible:shadow-glow-error',
     'disabled:pointer-events-none disabled:opacity-[0.38]',

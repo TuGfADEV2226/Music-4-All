@@ -156,7 +156,7 @@ export function AlbumClient({ albumId }: { albumId: string }) {
 
       {query.isError && !album && (
         <div className="flex flex-col items-center gap-3 py-16">
-          <p className="font-sans text-sm text-semantic-error">
+          <p className="font-sans text-sm text-semantic-error-on-dark">
             Couldn&apos;t load the album. Please try again.
           </p>
           <Button type="button" variant="secondary" size="sm" onClick={() => void query.refetch()}>
@@ -254,7 +254,7 @@ export function AlbumClient({ albumId }: { albumId: string }) {
                   lockedHint={HIFI_LOCKED_HINT}
                 />
               </div>
-              <p className="font-sans text-2xs text-disabled">
+              <p className="font-sans text-2xs text-secondary">
                 Applies to downloads from this album. Your default lives in Settings.
               </p>
             </div>
@@ -318,7 +318,7 @@ export function AlbumClient({ albumId }: { albumId: string }) {
                       >
                         <Play aria-hidden="true" className="h-4 w-4" />
                       </button>
-                      <span className="w-6 shrink-0 text-right font-mono text-xs text-disabled">
+                      <span className="w-6 shrink-0 text-right font-mono text-xs text-secondary">
                         {track.trackNumber}
                       </span>
                       <span className="flex-1 truncate font-sans text-sm text-primary">

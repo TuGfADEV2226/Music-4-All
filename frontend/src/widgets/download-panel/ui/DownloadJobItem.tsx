@@ -183,15 +183,15 @@ export function DownloadJobItem({
           <span>{formatDuration(job.etaSeconds)} left</span>
         )}
         {job.status === 'queued' && (
-          <span className="text-disabled">Waiting to start…</span>
+          <span>Waiting to start…</span>
         )}
         {isError && job.error && (
-          <span className="text-semantic-error" role="alert">
+          <span className="text-semantic-error-on-dark" role="alert">
             {job.error.message}
           </span>
         )}
         {isCompleted && (
-          <span className="text-semantic-success">Download complete</span>
+          <span className="text-semantic-success-on-dark">Download complete</span>
         )}
       </div>
 

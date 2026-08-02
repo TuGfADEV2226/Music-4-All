@@ -209,7 +209,7 @@ export function HiFiConnection() {
         )}
 
         {startMutation.isError && (
-          <p role="alert" className="font-sans text-xs text-semantic-error">
+          <p role="alert" className="font-sans text-xs text-semantic-error-on-dark">
             Couldn’t start the Hi-Fi login. Please try again.
           </p>
         )}

@@ -51,12 +51,20 @@ const config: Config = {
         },
 
         // Grupo D — Semántica de estado (design-system §1.1-D)
+        //
+        // `on-dark` es la variante para TEXTO. Los colores base están pensados
+        // como relleno (barras, puntos, bordes, fondos teñidos) y sobre las
+        // superficies oscuras se quedan en 3.0-3.7:1, por debajo del 4.5:1 que
+        // pide WCAG AA para texto: error, info y queue se aclaran solo cuando
+        // son glifos. Los rellenos NO cambian — WCAG 1.4.3 no aplica a ellos y
+        // aclararlos deslavaría el diseño. success y warning ya cumplen, pero
+        // mantienen la variante para que el uso sea uniforme.
         semantic: {
-          success: '#39D353',
-          warning: '#E8A020',
-          error:   '#E84040',
-          info:    '#3B82F6',
-          queue:   '#8B5CF6',
+          success: { DEFAULT: '#39D353', 'on-dark': '#39D353' },
+          warning: { DEFAULT: '#E8A020', 'on-dark': '#E8A020' },
+          error:   { DEFAULT: '#E84040', 'on-dark': '#EF7D7D' },
+          info:    { DEFAULT: '#3B82F6', 'on-dark': '#72A5F9' },
+          queue:   { DEFAULT: '#8B5CF6', 'on-dark': '#B192F9' },
         },
 
         // Grupo F — Synthwave, uso restringido (design-system §1.1-F)

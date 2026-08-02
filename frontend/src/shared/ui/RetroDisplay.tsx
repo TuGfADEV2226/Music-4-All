@@ -35,7 +35,7 @@ const COLORS: Record<RetroDisplayColor, ColorTokens> = {
     glow: '0 0 4px var(--color-teal-300), 0 0 12px var(--color-teal-300)',
   },
   amber: {
-    box: 'border-semantic-warning/40 text-semantic-warning',
+    box: 'border-semantic-warning/40 text-semantic-warning-on-dark',
     glow: '0 0 4px var(--color-warning), 0 0 10px var(--color-warning)',
   },
 }

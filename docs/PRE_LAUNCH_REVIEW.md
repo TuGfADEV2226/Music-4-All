@@ -207,9 +207,87 @@ Ambos casos quedan como test de regresión; el del 1 de enero **fuerza el huso**
 
 ## 0.E — UX y accesibilidad
 
-**Pendiente.** El gate automático de axe sí corre dentro de la suite e2e y no
-reporta violaciones Critical/Serious fuera de la deuda ya rastreada
-(`color-contrast`, 3 nodos en la vista Now Playing, que sale como aviso).
+### Contraste WCAG AA — CERRADO (roadmap 2.8)
+
+El gate de axe llevaba `color-contrast` en `TRACKED_DEBT_RULES`: se analizaba y
+se avisaba, pero **no bloqueaba**. Ahora la lista está **vacía** y el gate cubre
+**9 vistas** (antes 5).
+
+**Medido** (ratio de contraste sobre las superficies del sistema):
+
+| Token | void | console | studio | rack | AA (4.5:1) |
+|---|---|---|---|---|---|
+| `text-primary` #E8EFF5 | 16.99 | 15.24 | 13.64 | 11.61 | ✅ |
+| `text-secondary` #8FA3B8 | 7.60 | 6.82 | 6.10 | 5.19 | ✅ |
+| `text-disabled` #4D6278 | 3.13 | 2.81 | 2.51 | 2.14 | ❌ |
+
+Aclarar `text-disabled` hasta AA lo dejaría casi en `text-secondary` y aplanaría
+la jerarquía de tres niveles del diseño. Se hizo lo otro: **reclasificar**. Pasó
+a `text-secondary` el texto informativo que hay que leer — "Nothing playing",
+"Now Playing", "No active downloads", "Waiting to start…", el año del álbum, la
+nota del selector de calidad, los números de pista y la fecha del historial.
+`text-disabled` se queda **solo** en iconos decorativos (`aria-hidden`) y en
+estados `disabled:` de controles inactivos, que **WCAG 1.4.3 exime**.
+
+### Segundo fallo, que la excepción tapaba: los colores semánticos como texto
+
+Al quitar `color-contrast` de la lista, el gate falló en el dashboard por la
+insignia de estado de sesión (#E84040 sobre su propio fondo al 15 % = **4.35:1**).
+No era un caso aislado: los tokens semánticos están pensados como **relleno** y
+de glifos se quedan cortos en todas las superficies.
+
+| Como texto | rack (plano) | tinte 15 % sobre studio | tinte 15 % sobre rack |
+|---|---|---|---|
+| `error` #E84040 | 3.36 | 3.47 | 3.01 |
+| `info` #3B82F6 | 3.66 | 3.55 | 3.05 |
+| `queue` #8B5CF6 | 3.18 | 3.15 | 2.72 |
+| **`error-on-dark` #EF7D7D** | **5.07** | **5.23** | **4.54** |
+| **`info-on-dark` #72A5F9** | **5.43** | **5.27** | **4.52** |
+| **`queue-on-dark` #B192F9** | **5.35** | **5.31** | **4.58** |
+
+Se añadió la variante **`-on-dark`**, que se usa **solo cuando el color es
+texto** (`text-semantic-*-on-dark`). Los rellenos, bordes y puntos mantienen el
+color original: WCAG 1.4.3 no aplica a ellos y aclararlos deslavaría la barra de
+progreso, el borde del error de login y los indicadores de estado. `success` y
+`warning` ya cumplían; tienen la variante igualmente para que el uso sea uniforme
+y nadie tenga que recordar cuáles sí y cuáles no.
+
+### Ampliación del gate de accesibilidad
+
+De 5 vistas a 9: se añadieron **historial**, **biblioteca**, **ajustes** y el
+**panel de descargas con trabajos vivos** (un activo y uno fallido, conducidos
+por el WebSocket como en `download-flow.spec`). El panel era el hueco importante:
+las insignias de estado, la barra de progreso y el mensaje de error con
+`role="alert"` no aparecen en ninguna otra vista, y son justo donde vive el color
+semántico.
+
+**Fallo de método corregido por el camino:** axe calcula el contraste sobre el
+color **compuesto**, así que medir a mitad de un fade-in da un resultado que no
+es el que ve nadie (`text-secondary` al 71 % de opacidad reporta 4.32:1, y recién
+arrancado 1.1:1). El resultado dependía de cuándo llegase axe. Ahora
+`settleAnimations()` espera a que terminen las animaciones de entrada antes de
+medir; se excluyen las infinitas (shimmer, pulso neón) porque nunca terminan.
+
+### Gate nuevo: layout móvil y consola limpia
+
+`frontend/tests/e2e/mobile-layout.spec.ts` — 8 vistas a 390×844 (login,
+dashboard con resultados, álbum, artista, historial, biblioteca, ajustes y el
+cajón de navegación abierto). Comprueba dos cosas:
+
+- **Sin desbordamiento horizontal**: `documentElement.scrollWidth` contra el
+  ancho del viewport. Es el síntoma medible del "colapso de layout" que pedía el
+  plan — si algo se sale, la página se arrastra de lado y parte del contenido
+  queda fuera. Cuando falla, el mensaje nombra el elemento más ancho.
+- **0 errores de consola** por vista (`console.error` + excepciones no
+  capturadas). Se ignoran los errores de red, que en pruebas son de esperar (no
+  hay backend). **Verificado que el gate falla** inyectando un `console.error`.
+
+### Pendiente de 0.E: la pasada en vivo
+
+El recorrido manual con el skill `ux-audit` sobre la app en **modo producción
+local** (Docker) **queda pendiente**: necesita el stack levantado y una cuenta
+Tidal real. Lo automatizable de esa pasada — axe sin Critical/Serious, layout
+móvil y consola limpia — ya está cubierto arriba y corre en CI.
 
 ---
 

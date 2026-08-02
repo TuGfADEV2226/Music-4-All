@@ -126,7 +126,7 @@ export function DownloadPanel() {
                   </span>
                 )}
                 {!wsConnected && (
-                  <span className="flex items-center gap-1 font-mono text-xs text-semantic-warning">
+                  <span className="flex items-center gap-1 font-mono text-xs text-semantic-warning-on-dark">
                     <Loader aria-hidden="true" className="h-3 w-3 animate-spin" />
                     Reconnecting…
                   </span>
@@ -135,7 +135,7 @@ export function DownloadPanel() {
                   <span
                     role="status"
                     aria-live="polite"
-                    className="flex items-center gap-1 font-mono text-xs text-semantic-info"
+                    className="flex items-center gap-1 font-mono text-xs text-semantic-info-on-dark"
                   >
                     <RotateCw aria-hidden="true" className="h-3 w-3 animate-spin" />
                     Retrying…
@@ -189,7 +189,7 @@ export function DownloadPanel() {
                   role="status"
                   className="flex items-center justify-center py-8"
                 >
-                  <p className="font-sans text-sm text-disabled">No active downloads</p>
+                  <p className="font-sans text-sm text-secondary">No active downloads</p>
                 </div>
               ) : (
                 visibleJobs.map((job) => (

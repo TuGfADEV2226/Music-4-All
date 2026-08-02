@@ -153,7 +153,7 @@ export function AlbumCard({ album, onDownload, onPlay }: AlbumCardProps) {
 
         {/* Year — se omite si Tidal no da fecha (antes se pintaba "NaN") */}
         {album.releaseYear !== null && (
-          <p className="font-mono text-2xs text-disabled">
+          <p className="font-mono text-2xs text-secondary">
             {album.releaseYear}
           </p>
         )}

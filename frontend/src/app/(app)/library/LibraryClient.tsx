@@ -71,8 +71,8 @@ export function LibraryClient() {
         {/* Error */}
         {isError && !isLoading && (
           <div role="alert" className="flex flex-col items-center gap-4 py-16 text-center">
-            <CircleAlert className="h-12 w-12 text-semantic-error" aria-hidden="true" />
-            <p className="font-sans text-sm text-semantic-error">
+            <CircleAlert className="h-12 w-12 text-semantic-error-on-dark" aria-hidden="true" />
+            <p className="font-sans text-sm text-semantic-error-on-dark">
               Couldn&apos;t load your library.
             </p>
             <Button

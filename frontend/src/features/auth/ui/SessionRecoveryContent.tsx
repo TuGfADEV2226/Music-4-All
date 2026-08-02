@@ -199,7 +199,7 @@ export function SessionRecoveryContent({
           <p
             id="session-recovery-description"
             role="alert"
-            className="font-sans text-sm text-semantic-error"
+            className="font-sans text-sm text-semantic-error-on-dark"
           >
             {error ?? 'An unexpected error occurred.'}
           </p>

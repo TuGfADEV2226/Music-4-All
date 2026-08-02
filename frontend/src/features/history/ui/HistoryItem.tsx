@@ -76,12 +76,12 @@ export function HistoryItem({ record }: HistoryItemProps) {
       {/* Quality + date */}
       <div className="shrink-0 text-right">
         {/* Quality is a free-form string — not a Badge (can exceed 8 chars) */}
-        <span className="block font-mono text-xs font-medium text-semantic-success">
+        <span className="block font-mono text-xs font-medium text-semantic-success-on-dark">
           {record.quality}
         </span>
         <time
           dateTime={record.downloadedAt}
-          className="block font-mono text-xs text-disabled"
+          className="block font-mono text-xs text-secondary"
           aria-label={`Downloaded on ${dateLabel}`}
         >
           {dateLabel}

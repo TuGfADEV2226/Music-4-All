@@ -212,7 +212,7 @@ export function LoginForm() {
               role="alert"
               className="rounded-md border border-semantic-error bg-semantic-error/10 px-4 py-3"
             >
-              <p className="font-sans text-sm text-semantic-error">
+              <p className="font-sans text-sm text-semantic-error-on-dark">
                 Your account has been suspended. If you believe this is a mistake, contact support.
               </p>
             </div>
@@ -230,7 +230,7 @@ export function LoginForm() {
                 'bg-semantic-error/10'
               )}
             >
-              <p className="font-sans text-sm text-semantic-error">{error}</p>
+              <p className="font-sans text-sm text-semantic-error-on-dark">{error}</p>
             </motion.div>
           )}
 

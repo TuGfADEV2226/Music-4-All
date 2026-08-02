@@ -1,23 +1,34 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page, type WebSocketRoute } from '@playwright/test'
 
-import { buildSearchResponse, TOXICITY_ALBUM_DTO } from './fixtures/album'
+import { ARTIST_DETAIL, TOXICITY_ALBUM_DTO } from './fixtures/album'
 import { mockAuthenticatedSession } from './utils/auth'
 import { hideNextDevOverlay } from './utils/devOverlay'
+import {
+  mockAlbumDetail,
+  mockArtistDetail,
+  mockHistory,
+  mockSearch,
+  mockSessionUpkeep,
+  mockSettingsEndpoints,
+  mockSilentDownloadSocket,
+} from './utils/mocks'
+import { fillGlobalSearch } from './utils/search'
 
 /**
  * E2E — Accessibility (axe-core).
  *
- * Runs axe on the key views (Login, Dashboard, album detail modal, artist,
- * Now Playing / Walkman) and fails on any Critical or Serious WCAG 2.1 A/AA
- * violation — EXCEPT the rules in TRACKED_DEBT_RULES (see below), which are
- * still analyzed and printed as a warning but do not block the gate.
+ * Recorre las vistas clave (login, dashboard, álbum, artista, Now Playing,
+ * historial, biblioteca, ajustes y el panel de descargas con trabajos vivos) y
+ * falla ante cualquier violación Critical o Serious de WCAG 2.1 A/AA.
  *
- * Tracked debt (docs/roadmap.md): `color-contrast` on the dark-theme
- * low-emphasis token (text-disabled). Meeting WCAG AA there would require
- * brightening that token nearly to text-secondary, flattening the intended
- * three-tier visual hierarchy of the "neón moribundo" design. It is remediated
- * as a dedicated design task, not by this gate.
+ * `color-contrast` fue deuda rastreada (no bloqueaba) hasta la Fase 0.E: el
+ * token `text-disabled` (#4D6278) da 2.1-3.1:1 sobre las superficies y no llega
+ * al 4.5:1 de WCAG AA. En vez de aclararlo hasta casi `text-secondary` — que
+ * aplanaría la jerarquía de tres niveles del diseño — se reclasificó a
+ * `text-secondary` (5.2-7.6:1) el texto informativo que hay que leer.
+ * `text-disabled` queda solo para iconos decorativos y controles inactivos,
+ * que WCAG 1.4.3 exime. Ya no hay excepciones: la lista está vacía a propósito.
  *
  * All backend calls are mocked via page.route(); no real backend/Tidal needed.
  * Fixture covers use empty strings so no external image request is made.
@@ -25,33 +36,41 @@ import { hideNextDevOverlay } from './utils/devOverlay'
 
 const BLOCKING_IMPACTS = new Set(['critical', 'serious'])
 
-/** Serious/critical rules reported but not blocked — see docs/roadmap.md. */
-const TRACKED_DEBT_RULES = new Set(['color-contrast'])
+/** Serious/critical rules reported but not blocked. Vacío desde la Fase 0.E. */
+const TRACKED_DEBT_RULES = new Set<string>()
 
-/** Track referencing the Toxicity fixture album (cover '' → no network image). */
-const CHOP_SUEY_TRACK = {
-  id: '900001',
-  title: 'Chop Suey!',
-  track_number: 1,
-  duration: 210,
-  audio_quality: 'HIGH',
-  audio_modes: [],
-  isrc: 'USRC10000001',
-  artist: TOXICITY_ALBUM_DTO.artist,
-  album: { id: TOXICITY_ALBUM_DTO.id, title: TOXICITY_ALBUM_DTO.title, cover: '' },
-}
+/**
+ * Espera a que terminen las animaciones de entrada antes de medir.
+ *
+ * axe calcula el contraste sobre el color **compuesto**, así que un elemento a
+ * mitad de su fade-in reporta un contraste que no es el que ve el usuario
+ * (`text-secondary` al 71 % de opacidad da 4.32:1 en vez de 7.9:1, y recién
+ * empezado 1.1:1). Sin esta espera el resultado depende de cuándo llegue axe.
+ *
+ * Dos partes, porque ninguna basta sola: la espera fija cubre las animaciones
+ * que framer-motion resuelve en JS (no aparecen en `getAnimations()`) y las que
+ * aún no se han creado cuando se mide; el bucle sobre WAAPI cubre las
+ * encadenadas. Se excluyen las infinitas (shimmer, pulso neón): no terminan.
+ */
+const ENTRANCE_ANIMATION_MS = 700
 
-const ARTIST_DETAIL = {
-  artist: { id: TOXICITY_ALBUM_DTO.artist.id, name: TOXICITY_ALBUM_DTO.artist.name, picture: null },
-  top_tracks: [CHOP_SUEY_TRACK],
-  albums: [TOXICITY_ALBUM_DTO],
-  ep_singles: [{ ...TOXICITY_ALBUM_DTO, id: '999', title: 'A Single', type: 'SINGLE' }],
-  other: [{ ...TOXICITY_ALBUM_DTO, id: '998', title: 'A Compilation', type: 'COMPILATION' }],
-  similar: [{ id: '424242', name: 'Similar Artist', picture: null }],
+async function settleAnimations(page: Page): Promise<void> {
+  await page.waitForTimeout(ENTRANCE_ANIMATION_MS)
+  await page.evaluate(async () => {
+    const pending = () =>
+      document.getAnimations().filter((a) => (a.effect?.getTiming().iterations ?? 1) !== Infinity)
+    for (let round = 0; round < 3; round += 1) {
+      const running = pending()
+      if (running.length === 0) break
+      await Promise.all(running.map((a) => a.finished.catch(() => undefined)))
+    }
+  })
 }
 
 /** Analyze the current page and fail if any Critical/Serious violation exists. */
 async function expectNoBlockingViolations(page: Page, view: string): Promise<void> {
+  await settleAnimations(page)
+
   const { violations } = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze()
@@ -92,7 +111,8 @@ test.describe('Accessibility (axe) — no Critical/Serious violations', () => {
 
   test('dashboard (empty state)', async ({ page }) => {
     await mockAuthenticatedSession(page)
-    await page.routeWebSocket('**/ws/downloads', () => {})
+    await mockSessionUpkeep(page)
+    await mockSilentDownloadSocket(page)
 
     await page.goto('/dashboard')
     await expect(
@@ -103,12 +123,9 @@ test.describe('Accessibility (axe) — no Critical/Serious violations', () => {
 
   test('album page', async ({ page }) => {
     await mockAuthenticatedSession(page)
-    await page.routeWebSocket('**/ws/downloads', () => {})
-    await page.route('**/api/albums/**', (route) =>
-      route.fulfill({
-        json: { album: TOXICITY_ALBUM_DTO, tracks: [CHOP_SUEY_TRACK] },
-      }),
-    )
+    await mockSessionUpkeep(page)
+    await mockSilentDownloadSocket(page)
+    await mockAlbumDetail(page)
 
     await page.goto(`/album/${TOXICITY_ALBUM_DTO.id}`)
     await expect(page.getByRole('heading', { name: TOXICITY_ALBUM_DTO.title })).toBeVisible()
@@ -117,8 +134,9 @@ test.describe('Accessibility (axe) — no Critical/Serious violations', () => {
 
   test('artist page', async ({ page }) => {
     await mockAuthenticatedSession(page)
-    await page.routeWebSocket('**/ws/downloads', () => {})
-    await page.route('**/api/artists/**', (route) => route.fulfill({ json: ARTIST_DETAIL }))
+    await mockSessionUpkeep(page)
+    await mockSilentDownloadSocket(page)
+    await mockArtistDetail(page)
 
     await page.goto(`/artist/${ARTIST_DETAIL.artist.id}`)
     await expect(
@@ -135,8 +153,9 @@ test.describe('Accessibility (axe) — no Critical/Serious violations', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await hideNextDevOverlay(page)
     await mockAuthenticatedSession(page)
-    await page.routeWebSocket('**/ws/downloads', () => {})
-    await page.route('**/api/artists/**', (route) => route.fulfill({ json: ARTIST_DETAIL }))
+    await mockSessionUpkeep(page)
+    await mockSilentDownloadSocket(page)
+    await mockArtistDetail(page)
     // Stream is proxied to <audio>; an empty body is enough — the store sets
     // `current` synchronously, so the overlay is present regardless of decode.
     await page.route('**/api/download/stream/**', (route) =>
@@ -151,5 +170,113 @@ test.describe('Accessibility (axe) — no Critical/Serious violations', () => {
 
     await expect(page.getByRole('dialog', { name: 'Now Playing player' })).toBeVisible()
     await expectNoBlockingViolations(page, 'now playing overlay')
+  })
+
+  test('history', async ({ page }) => {
+    await mockAuthenticatedSession(page)
+    await mockSessionUpkeep(page)
+    await mockSilentDownloadSocket(page)
+    await mockHistory(page)
+
+    await page.goto('/history')
+    await expect(page.getByRole('heading', { name: 'Download History' })).toBeVisible()
+    await expectNoBlockingViolations(page, 'history')
+  })
+
+  test('library', async ({ page }) => {
+    // La biblioteca se construye agrupando el historial: mismo mock.
+    await mockAuthenticatedSession(page)
+    await mockSessionUpkeep(page)
+    await mockSilentDownloadSocket(page)
+    await mockHistory(page)
+
+    await page.goto('/library')
+    await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible()
+    await expectNoBlockingViolations(page, 'library')
+  })
+
+  test('settings', async ({ page }) => {
+    await mockAuthenticatedSession(page)
+    await mockSessionUpkeep(page)
+    await mockSilentDownloadSocket(page)
+    await mockSettingsEndpoints(page)
+
+    await page.goto('/settings')
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
+    await expectNoBlockingViolations(page, 'settings')
+  })
+
+  test('download panel with an active and a failed job', async ({ page }) => {
+    // Los estados del panel (badges de estado, barra de progreso, mensaje de
+    // error con role=alert) no aparecen en ninguna de las vistas de arriba y
+    // son justo donde vive el color semántico: se auditan con dos trabajos
+    // reales conducidos por el WebSocket, como en download-flow.spec.
+    await mockAuthenticatedSession(page)
+    await mockSessionUpkeep(page)
+    await mockSearch(page)
+
+    let jobSeq = 0
+    await page.route('**/api/downloads', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.fallback()
+        return
+      }
+      jobSeq += 1
+      await route.fulfill({
+        json: { job_id: `job-${jobSeq}`, status: 'queued', estimated_tracks: 14 },
+      })
+    })
+
+    let wsRoute: WebSocketRoute | undefined
+    await page.routeWebSocket('**/ws/downloads', (ws) => {
+      wsRoute = ws
+    })
+
+    await page.goto('/dashboard')
+    await fillGlobalSearch(page, 'System of a Down')
+
+    const albumCard = page.getByRole('article', {
+      name: `${TOXICITY_ALBUM_DTO.title} by ${TOXICITY_ALBUM_DTO.artist.name}, 2001`,
+    })
+    const downloadButton = albumCard.getByRole('button', {
+      name: `Download ${TOXICITY_ALBUM_DTO.title} by ${TOXICITY_ALBUM_DTO.artist.name}`,
+    })
+    await downloadButton.click()
+    await expect(page.getByRole('region', { name: 'Download panel' })).toBeVisible()
+    await downloadButton.click()
+    // Acotado a la lista del panel: la barra lateral también tiene listitems.
+    const jobList = page.getByRole('list', { name: /download job/ })
+    await expect(jobList.getByRole('listitem')).toHaveCount(2)
+
+    await expect.poll(() => wsRoute !== undefined).toBe(true)
+    wsRoute!.send(JSON.stringify({ type: 'job_started', job_id: 'job-1', payload: {} }))
+    wsRoute!.send(
+      JSON.stringify({
+        type: 'progress',
+        job_id: 'job-1',
+        payload: {
+          current_track_filename: '01 - Prison Song.flac',
+          completed_tracks: 3,
+          total_tracks: 14,
+          progress_percent: 45,
+          speed_mbps: 2.4,
+          eta_seconds: 90,
+        },
+      }),
+    )
+    wsRoute!.send(JSON.stringify({ type: 'job_started', job_id: 'job-2', payload: {} }))
+    wsRoute!.send(
+      JSON.stringify({
+        type: 'job_error',
+        // 500 y no 401/403: un error de sesión abriría el modal de recuperación
+        // y lo auditado dejaría de ser el panel.
+        job_id: 'job-2',
+        payload: { code: 500, message: 'Download failed', retriable: true },
+      }),
+    )
+
+    await expect(jobList.getByText('ACTIVE', { exact: true })).toBeVisible()
+    await expect(jobList.getByText('ERROR', { exact: true })).toBeVisible()
+    await expectNoBlockingViolations(page, 'download panel (active + error)')
   })
 })

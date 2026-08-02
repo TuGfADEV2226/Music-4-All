@@ -123,7 +123,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             id={`${id}-helper`}
             className={cn(
               'font-sans text-xs',
-              error ? 'text-semantic-error' : 'text-secondary'
+              error ? 'text-semantic-error-on-dark' : 'text-secondary'
             )}
           >
             {helperText}

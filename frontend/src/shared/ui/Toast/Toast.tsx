@@ -29,10 +29,10 @@ const ACCENT_BORDER: Record<ToastVariant, string> = {
 }
 
 const ICON_COLOR: Record<ToastVariant, string> = {
-  success: 'text-semantic-success',
-  error:   'text-semantic-error',
-  warning: 'text-semantic-warning',
-  info:    'text-semantic-info',
+  success: 'text-semantic-success-on-dark',
+  error:   'text-semantic-error-on-dark',
+  warning: 'text-semantic-warning-on-dark',
+  info:    'text-semantic-info-on-dark',
 }
 
 const DEFAULT_DURATIONS: Record<ToastVariant, number> = {
