@@ -2,6 +2,12 @@
 
 > **AVISO — Auditoría histórica.** Es una foto de un estado anterior del repo. Varios hallazgos **ya están resueltos** (código huérfano eliminado, tests en verde 176✓/98✓, `ruff` limpio, frontend en FSD sin restos legacy). Verificar cada hallazgo contra el estado actual antes de accionar. Estado vigente en `docs/roadmap.md`.
 
+> **TD-05 CERRADO (2026-08-01).** Era el último hallazgo abierto: `DownloadPanel`,
+> `ProgressBar` y los mappers ya tienen tests (Vitest 240), y la suite Playwright
+> existe y está verde (36 tests en 3 navegadores). Detalle en
+> [`docs/PRE_LAUNCH_REVIEW.md`](../PRE_LAUNCH_REVIEW.md) §0.D. **Los 14 hallazgos
+> de este documento están resueltos**; lo de abajo queda como registro histórico.
+
 > **Estado de vigencia — revisado 2026-07-02.** Este documento **ya está actualizado**: refleja 13/14 hallazgos resueltos (queda **TD-05**, testing frontend, parcial). Confirmado contra el código al 2026-07-02: backend `ruff`/`mypy`/`pytest` y frontend `lint`/`build`/`vitest` (**87 tests**) en verde. Nota adicional: `frontend/src/app/middleware.ts` (scaffold no-op duplicado, no ejecutado por Next.js) fue **eliminado el 2026-07-02**; el middleware activo es `frontend/src/middleware.ts`.
 
 > Auditoría de deuda técnica del estado **real** del repositorio en la fecha de este documento. Basada en lectura directa de código, ejecución de `ruff`/`bandit`, resultados de `pytest` documentados en [`docs/roadmap.md`](../roadmap.md) y hallazgos de los audits hermanos: [`ARCHITECTURE_AUDIT.md`](ARCHITECTURE_AUDIT.md), [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md), [`PERFORMANCE_AUDIT.md`](PERFORMANCE_AUDIT.md), [`UX_AUDIT.md`](UX_AUDIT.md).

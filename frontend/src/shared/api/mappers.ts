@@ -32,13 +32,27 @@ export function coverAtSize(url: string, size: number): string {
   return url.replace(/\/\d+x\d+\.jpg$/, `/${snapped}x${snapped}.jpg`)
 }
 
+/**
+ * Año de publicación a partir del `"YYYY-MM-DD"` que manda el backend.
+ *
+ * No sirve `new Date(dto.release_date).getFullYear()`: una fecha sin hora se
+ * interpreta como UTC y `getFullYear()` responde en hora local, así que un disco
+ * publicado un 1 de enero retrocedía un año en cualquier huso negativo
+ * (`2020-01-01` → 2019 en UTC-6). Y cuando Tidal no trae fecha el backend manda
+ * `""`, que por esa vía acababa imprimiendo `NaN` en la ficha del álbum.
+ */
+function releaseYearOf(releaseDate: string): number | null {
+  const match = /^(\d{4})/.exec(releaseDate)
+  return match ? Number(match[1]) : null
+}
+
 export function mapAlbumDTO(dto: AlbumDTO): Album {
   return {
     id: dto.id,
     title: dto.title,
     artist: dto.artist,
     coverUrl: dto.cover ? coverIdToUrl(dto.cover) : '',
-    releaseYear: new Date(dto.release_date).getFullYear(),
+    releaseYear: releaseYearOf(dto.release_date),
     releaseDate: dto.release_date,
     numberOfTracks: dto.number_of_tracks,
     durationSeconds: dto.duration,

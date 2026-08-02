@@ -55,7 +55,11 @@ export function AlbumCard({ album, onDownload, onPlay }: AlbumCardProps) {
 
   return (
     <article
-      aria-label={`${album.title} by ${album.artist.name}, ${album.releaseYear}`}
+      aria-label={
+        album.releaseYear
+          ? `${album.title} by ${album.artist.name}, ${album.releaseYear}`
+          : `${album.title} by ${album.artist.name}`
+      }
       className="group flex flex-col items-center gap-3"
     >
       {/* ── Vinyl disc — opens album detail (click target) ─────────────── */}
@@ -147,10 +151,12 @@ export function AlbumCard({ album, onDownload, onPlay }: AlbumCardProps) {
           )}
         </p>
 
-        {/* Year */}
-        <p className="font-mono text-2xs text-disabled">
-          {album.releaseYear}
-        </p>
+        {/* Year — se omite si Tidal no da fecha (antes se pintaba "NaN") */}
+        {album.releaseYear !== null && (
+          <p className="font-mono text-2xs text-disabled">
+            {album.releaseYear}
+          </p>
+        )}
 
         {/* Download button */}
         {onDownload && (

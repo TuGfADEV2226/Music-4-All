@@ -4,16 +4,17 @@ Resultado de la fase de revisión y endurecimiento previa a exponer Music 4 All 
 público. Sirve para **no volver a auditar lo mismo** en cada sesión: cada ítem
 dice qué se hizo, qué se decidió no hacer y por qué.
 
-Rama: `chore/pre-launch-hardening`. Fecha: 2026-07-31.
+Ramas: `chore/pre-launch-hardening` (0.A/0.B/0.C/0.G, 2026-07-31) y
+`chore/pre-launch-hardening-2` (0.D/0.E/0.F, 2026-08-01).
 
-Estado global de la suite al cerrar la fase:
+Estado global de la suite:
 
 | Gate | Resultado |
 |---|---|
 | Backend `pytest` | 363 passed, 2 skipped |
 | Backend `ruff check` + `format --check` | limpio |
 | Backend `pip-audit` | **0 vulnerabilidades conocidas** |
-| Frontend `pnpm test` (Vitest) | 175 passed |
+| Frontend `pnpm test` (Vitest) | **240 passed** (175 al cerrar 0.G, +65 en 0.D) |
 | Frontend `pnpm lint` + `pnpm build` | limpio |
 | Frontend `pnpm test:e2e` (Playwright) | **36 passed** en chromium + firefox + webkit |
 | Frontend `pnpm audit --prod` | **0 vulnerabilidades conocidas** |
@@ -168,9 +169,39 @@ El roadmap decía 49 errores y la auditoría técnica decía 0. La cifra real ho
 mypy **no está en CI** y no se ha añadido: hacerlo exigiría limpiar o silenciar
 estos 13 primero. Queda documentado para decidirlo aparte.
 
-### TD-05 (cobertura de `DownloadPanel`, `ProgressBar`, mappers)
+### TD-05 (cobertura de `DownloadPanel`, `ProgressBar`, mappers) — CERRADO
 
-**Pendiente.** No abordado en esta fase.
+Los tres huecos que quedaban abiertos de la auditoría técnica. **65 tests nuevos**
+(Vitest 175 → **240**), sin tocar los existentes:
+
+| Archivo | Tests | Qué cubre |
+|---|---|---|
+| `tests/unit/components/ProgressBar.test.tsx` | 18 | ARIA (`role=progressbar`, rango, `aria-valuetext`), recorte de valores fuera de 0-100, ancho del relleno, variante `indeterminate` (sin `aria-valuenow`), colores por variante, glow del track en cola, respiración neón solo en `download` y **solo sin `prefers-reduced-motion`** |
+| `tests/unit/components/DownloadPanel.test.tsx` | 25 | Que el **socket WS se monta aunque no haya nada que pintar** (el panel es el singleton del WS, `CLAUDE.md` §8), resumen colapsado, `aria-busy`, expandir/colapsar, aviso de reconexión, orden de la lista, estado vacío, limpiar completados, pausar/reanudar/cancelar con el **id de backend**, recuperación de sesión y reproducir una descarga de una sola pista |
+| `tests/unit/entities/mappers.test.ts` | 15 | `coverIdToUrl`, `mapAlbumDTO`, `mapTrackDTO`, `mapWsMessageToProgress`: campos opcionales ausentes, carátula vacía, contexto de álbum y ceros del WebSocket (0 % / 0 MB/s no deben perderse) |
+| `tests/unit/entities/entityUtils.test.ts` | 7 | `getAudioQualityLabel`, `getAudioModeLabel`, `formatTrackNumber`, `isJobActive`, `isJobTerminal` |
+
+En `DownloadPanel` solo se sustituyen las piezas que salen del proceso (WebSocket,
+mutaciones HTTP, modal de recuperación): el store y `useDownloadQueue` son los
+reales, así que lo que se prueba es el comportamiento, no el mock.
+
+#### Dos fallos reales encontrados al escribir los tests de mappers — CORREGIDOS
+
+`mapAlbumDTO` calculaba el año con `new Date(dto.release_date).getFullYear()`:
+
+1. **Año equivocado en lanzamientos del 1 de enero.** Una fecha sin hora
+   (`"2020-01-01"`) se interpreta como medianoche **UTC** y `getFullYear()`
+   responde en hora **local** → en cualquier huso negativo el álbum salía como
+   **2019**. Afecta a todo usuario de América.
+2. **`NaN` impreso en la ficha.** Cuando Tidal no publica fecha, el backend manda
+   `""` (`_release_date_str` en `search/repository.py`); `new Date("")` es
+   *Invalid Date* y la tarjeta pintaba literalmente `NaN`.
+
+Corregido leyendo el año del propio texto `"YYYY-MM-DD"`. `Album.releaseYear`
+pasa a ser `number | null` y los tres puntos que lo pintaban (tarjeta de álbum,
+su `aria-label` y la cabecera de `/album/[id]`) **omiten el año** si no hay fecha.
+Ambos casos quedan como test de regresión; el del 1 de enero **fuerza el huso**
+(`process.env.TZ`) porque CI corre en UTC y allí el fallo no se reproduce.
 
 ---
 

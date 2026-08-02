@@ -204,8 +204,13 @@ export function AlbumClient({ albumId }: { albumId: string }) {
                 ) : (
                   <span className="font-medium text-primary">{album.artist.name}</span>
                 )}
-                <span aria-hidden="true"> · </span>
-                {album.releaseYear}
+                {/* El año se omite si Tidal no da fecha (antes salía "NaN") */}
+                {album.releaseYear !== null && (
+                  <>
+                    <span aria-hidden="true"> · </span>
+                    {album.releaseYear}
+                  </>
+                )}
                 <span aria-hidden="true"> · </span>
                 {tracks.length} {tracks.length === 1 ? 'track' : 'tracks'}
               </p>

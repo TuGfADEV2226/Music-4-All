@@ -16,7 +16,8 @@ export interface Album {
   readonly title: string
   readonly artist: Artist
   readonly coverUrl: string
-  readonly releaseYear: number
+  /** null cuando Tidal no publica fecha de lanzamiento para el álbum. */
+  readonly releaseYear: number | null
   readonly releaseDate: string
   readonly numberOfTracks: number
   readonly durationSeconds: number
