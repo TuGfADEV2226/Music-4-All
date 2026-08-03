@@ -14,6 +14,29 @@ import { usePushNotifications } from '../model/usePushNotifications'
  * claves VAPID) — así no aparece un control muerto. Si no hay service worker (dev o
  * app no instalada), muestra la razón en vez del toggle.
  */
+const READY_HINT = 'Get a push notification on this device when a download finishes.'
+
+/**
+ * Por qué el control está apagado. El mensaje anterior era siempre "Install the
+ * app", y eso solo es cierto en iOS: Safari exige añadir la web a la pantalla de
+ * inicio para permitir push, mientras que en Android y escritorio funciona en la
+ * pestaña normal. Decirle a alguien en Android que instale la app le manda a
+ * hacer algo que no arregla nada — lo que falta ahí es el service worker, que en
+ * desarrollo no se registra a propósito.
+ */
+function unavailableHint(): string {
+  if (typeof navigator === 'undefined') return 'Download notifications are unavailable.'
+  const ua = navigator.userAgent
+  const isIos = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+  const isStandalone =
+    typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches
+
+  if (isIos && !isStandalone) {
+    return 'On iOS, add Music 4 All to your home screen first — Safari only allows notifications for installed apps.'
+  }
+  return 'Notifications are not available in this session yet. Reload the page, and note they are disabled while the app runs in development mode.'
+}
+
 export function PushNotificationsToggle() {
   const { supported, backendEnabled, swReady, subscribed, busy, error, enable, disable } =
     usePushNotifications()
@@ -33,9 +56,7 @@ export function PushNotificationsToggle() {
               Download notifications
             </h2>
             <p className="mt-1 font-sans text-sm text-secondary">
-              {swReady
-                ? 'Get a push notification on this device when a download finishes.'
-                : 'Install the app to enable download notifications.'}
+              {swReady ? READY_HINT : unavailableHint()}
             </p>
             {error && <p className="mt-1 font-sans text-xs text-semantic-error-on-dark">{error}</p>}
           </div>

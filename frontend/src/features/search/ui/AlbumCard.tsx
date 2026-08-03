@@ -63,7 +63,13 @@ export function AlbumCard({ album, onDownload, onPlay }: AlbumCardProps) {
       className="group flex flex-col items-center gap-3"
     >
       {/* ── Vinyl disc — opens album detail (click target) ─────────────── */}
-      <div className="relative w-full">
+      {/* `isolate` (isolation: isolate) crea un contexto de apilado propio. Sin
+          él, los hijos con `z-raised` (etiqueta de calidad, botón de play, punto
+          central) viven en el contexto RAÍZ: `position: relative` sin `z-index`
+          no crea contexto, así que competían con las capas globales. En Android
+          se colaban por encima del cajón de navegación (z-modal) — se veían los
+          botones de play y las etiquetas flotando sobre el menú abierto. */}
+      <div className="relative isolate w-full">
         <Link
           href={`/album/${album.id}`}
           aria-label={`Open ${album.title}`}

@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     # ociosos (sin descargas en curso) para liberar su directorio temporal.
     max_user_engines: int = 50
     engine_idle_ttl: int = 1800  # 30 min sin uso → evicción
+    # Carpeta persistente de descargas (en Docker, el volumen montado). Vacío =
+    # un directorio temporal por motor, que se borra al evictarlo: la música
+    # desaparecía sola a los 30 min y engordaba el disco del contenedor en vez
+    # del volumen. Cada usuario tiene su subcarpeta dentro.
+    download_dir: str = ""
     # Cada validación de sesión es una petición HTTP a Tidal, y era una por cada
     # petición autenticada: ~130 ms de suelo aunque la respuesta viniera de caché,
     # y una llamada al client_id compartido por vista. Se revalida como mucho una

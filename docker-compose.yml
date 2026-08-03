@@ -39,6 +39,10 @@ services:
       - "8000:8000"
     environment:
       - TIDAL_QUALITY=LOSSLESS
+      # Carpeta persistente de descargas = el volumen montado abajo. Sin esta
+      # variable los ficheros caen en un temporal del contenedor: se borran al
+      # evictar el motor y engordan el disco de Docker, no el volumen.
+      - DOWNLOAD_DIR=/app/downloads
       - REDIS_URL=redis://valkey:6379
       - DATABASE_URL=postgresql://music4all:music4all@postgres:5432/music4all
       # Cifra los tokens Tidal en reposo. Se toma del .env de la raíz (ignorado por

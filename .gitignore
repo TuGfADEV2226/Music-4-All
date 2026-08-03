@@ -97,3 +97,7 @@ frontend/blob-report/
 # Pruebas de carga — el fichero de sids son identificadores de sesion validos
 # (equivalen a estar logueado). Se generan con backend/tests/load/seed_sessions.py.
 loadtest_sids.txt
+
+# Capturas de pantalla de las pruebas manuales en movil (bugs visuales).
+# Se quedan en local: son fotos pesadas y de un dispositivo concreto.
+/Testing_screenshots/

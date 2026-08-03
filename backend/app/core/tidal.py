@@ -66,7 +66,13 @@ class TidalDownloader:
     FFMPEG_BIN = Path("ffmpeg.exe")  # Se ajustará automáticamente en __init__
     _temp_dir: Path | None
 
-    def __init__(self, log_callback=print, session_data: dict | None = None, is_pkce: bool = False):
+    def __init__(
+        self,
+        log_callback=print,
+        session_data: dict | None = None,
+        is_pkce: bool = False,
+        download_dir: str | Path | None = None,
+    ):
         self.log = log_callback
         self.quality = Quality.hi_res_lossless
         # is_pkce marca la sesión como PKCE (16-bit): tidalapi refresca el token con
@@ -81,16 +87,43 @@ class TidalDownloader:
         # session.audio_quality is not thread-safe without this lock.
         self._stream_lock = threading.Lock()
         self._temp_dir = None
-        self._setup_temp_dir()
+        self._setup_download_dir(download_dir)
         self._auto_detect_ffmpeg()
 
-    # ---------- Directorio temporal ----------
-    def _setup_temp_dir(self):
+    # ---------- Directorio de descargas ----------
+    def _setup_download_dir(self, download_dir: str | Path | None) -> None:
+        """Elige dónde caen los ficheros descargados.
+
+        Con `download_dir` los ficheros van a una carpeta **persistente** (en
+        Docker, el volumen montado). Sin él se usa un temporal, que es lo que
+        había siempre: el problema es que ese temporal se borra al evictar el
+        motor (30 min sin uso) y al terminar el proceso, así que la música
+        desaparecía sin avisar y, mientras existía, engordaba el disco del
+        contenedor en vez del volumen — 4,2 GB medidos en una sola sesión de
+        pruebas, con la carpeta montada vacía.
+        """
+        if download_dir:
+            path = Path(download_dir)
+            path.mkdir(parents=True, exist_ok=True)
+            self._temp_dir = path
+            self._is_temp_dir = False
+            self.log(f"Directorio de descargas: {path}")
+            return
+
         self._temp_dir = Path(tempfile.mkdtemp(prefix="tidal_dl_"))
+        self._is_temp_dir = True
         atexit.register(self._cleanup_temp_dir)
         self.log(f"Directorio temporal de descargas: {self._temp_dir}")
 
     def _cleanup_temp_dir(self):
+        """Borra el directorio **solo si es temporal**.
+
+        Con una carpeta persistente esto no debe tocar nada: la evicción de un
+        motor ocioso borraría la música ya descargada del usuario (y, si la
+        carpeta fuera compartida, la de todos).
+        """
+        if not getattr(self, "_is_temp_dir", True):
+            return
         if self._temp_dir and self._temp_dir.exists():
             shutil.rmtree(self._temp_dir, ignore_errors=True)
             self.log("Directorio temporal eliminado.")
@@ -98,7 +131,7 @@ class TidalDownloader:
     @property
     def download_folder(self) -> Path:
         assert self._temp_dir is not None, (
-            "_setup_temp_dir must be called before accessing download_folder"
+            "_setup_download_dir must be called before accessing download_folder"
         )
         return self._temp_dir
 
@@ -663,6 +696,7 @@ class TidalDownloader:
                     # de 300 es una salvaguarda (≈ pistas muy largas) y el progreso usa
                     # una estimación (seg/50) al no conocerse el total real por adelantado.
                     seg = 1
+                    dl = 0
                     while seg < 300:
                         if cancel_event and cancel_event.is_set():
                             return False, "Cancelado"
@@ -672,9 +706,13 @@ class TidalDownloader:
                             break
                         r.raise_for_status()
                         f_out.write(r.content)
+                        dl += len(r.content)
                         seg += 1
                         if progress_callback:
-                            progress_callback(min(seg / 50.0, 0.99))
+                            # Segundo argumento: bytes acumulados de esta pista. Es lo
+                            # que permite calcular la velocidad real; sin él el
+                            # medidor de la interfaz marcaba 0.0 MB/s siempre.
+                            progress_callback(min(seg / 50.0, 0.99), dl)
                 elif method == "DIRECT":
                     response = requests.get(url_media, stream=True, timeout=15)
                     response.raise_for_status()
@@ -687,7 +725,7 @@ class TidalDownloader:
                             dl += len(chunk)
                             f_out.write(chunk)
                             if progress_callback and total_length > 0:
-                                progress_callback(dl / total_length)
+                                progress_callback(dl / total_length, dl)
             return True, ""
         except requests.exceptions.ConnectionError:
             return False, "Conexión perdida."

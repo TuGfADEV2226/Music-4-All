@@ -92,6 +92,7 @@ async def lifespan(app: FastAPI):
         max_engines=settings.max_user_engines,
         idle_ttl=settings.engine_idle_ttl,
         auth_recheck_interval=settings.engine_auth_recheck_interval,
+        download_dir=settings.download_dir,
     )
     session_data = await rc.load_session(app.state.redis)
     app.state.engine = TidalDownloader(session_data=session_data)

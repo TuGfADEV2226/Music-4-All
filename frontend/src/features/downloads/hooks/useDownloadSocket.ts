@@ -57,6 +57,7 @@ class DownloadWebSocketClient {
   private ws: WebSocket | null = null
   private attempts  = 0
   private heartbeat: ReturnType<typeof setInterval> | null = null
+  private retry: ReturnType<typeof setTimeout> | null = null
   private lastPong  = Date.now()
   private destroyed = false
 
@@ -129,12 +130,38 @@ class DownloadWebSocketClient {
     if (this.attempts >= MAX_ATTEMPTS) return
     const delay = Math.min(1_000 * 2 ** this.attempts, 30_000)
     this.attempts++
-    setTimeout(() => this.connect(), delay)
+    this.retry = setTimeout(() => this.connect(), delay)
+  }
+
+  /**
+   * Reconecta **ya**, sin esperar al backoff, y reiniciando la cuenta.
+   *
+   * Lo llama el hook cuando la pestaña vuelve a ser visible o el dispositivo
+   * recupera la red. En el móvil es imprescindible: al mandar la pestaña a
+   * segundo plano el navegador congela los temporizadores y mata el socket, así
+   * que al volver el reintento programado podía tardar hasta 30 s en
+   * dispararse — o no dispararse — y la interfaz se quedaba en "Offline" sin
+   * que nada lo explicara. Además, agotados los 10 intentos, `scheduleReconnect`
+   * se rendía para siempre y solo se recuperaba recargando la página.
+   */
+  reconnectNow(): void {
+    if (this.destroyed) return
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) return
+    if (this.retry !== null) {
+      clearTimeout(this.retry)
+      this.retry = null
+    }
+    this.attempts = 0
+    this.connect()
   }
 
   disconnect(): void {
     this.destroyed = true
     this.stopHeartbeat()
+    if (this.retry !== null) {
+      clearTimeout(this.retry)
+      this.retry = null
+    }
     const ws = this.ws
     if (ws) {
       // Cerrar un socket aún en CONNECTING dispara el warning "WebSocket is
@@ -247,6 +274,23 @@ export function useDownloadSocket(): void {
     )
 
     client.connect()
-    return () => client.disconnect()
+
+    // Volver a la pestaña o recuperar la red reconecta al instante. Sin esto, en
+    // el móvil el socket muere al pasar a segundo plano (el navegador congela la
+    // página) y al volver había que esperar al backoff — hasta 30 s — o recargar
+    // si ya se habían agotado los reintentos.
+    const revive = () => {
+      if (document.visibilityState === 'visible') client.reconnectNow()
+    }
+    document.addEventListener('visibilitychange', revive)
+    window.addEventListener('online', revive)
+    window.addEventListener('pageshow', revive)
+
+    return () => {
+      document.removeEventListener('visibilitychange', revive)
+      window.removeEventListener('online', revive)
+      window.removeEventListener('pageshow', revive)
+      client.disconnect()
+    }
   }, [wsUrl])
 }

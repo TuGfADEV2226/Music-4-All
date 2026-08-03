@@ -211,6 +211,11 @@ async def _process_job(
     # the cap is per job, not per track. Only the worker's download thread reads
     # and writes it, and tracks download sequentially, so no locking is needed.
     last_pub = {"t": 0.0, "pct": -1}
+    # Muestra anterior para calcular la velocidad real: bytes acumulados de la
+    # pista en curso y el instante en que se midieron. `bytes` se reinicia al
+    # empezar cada pista (el contador viene del descargador y es por pista), así
+    # que un valor menor que el anterior significa "pista nueva".
+    last_speed = {"t": 0.0, "bytes": 0, "mbps": 0.0}
 
     for i, track in enumerate(tracks):
         # Pause: wait between tracks until resumed or cancelled, ceding the
@@ -228,7 +233,7 @@ async def _process_job(
         track_name: str = getattr(track, "name", "") or ""
 
         def make_cb(idx: int, name: str, n_done: int):
-            def cb(p: float) -> None:
+            def cb(p: float, downloaded_bytes: int | None = None) -> None:
                 ovr = round((idx + p) / total * 100, 1)
                 now = time.monotonic()
                 # Throttle: emit only when the whole-percent step advances, or at
@@ -239,8 +244,23 @@ async def _process_job(
                 last_pub["t"] = now
                 elapsed = now - start_time
                 # Linear ETA from elapsed time and overall progress.
-                # speed_mbps stays 0.0 — no byte-count data available from TidalDownloader.
                 eta = round(elapsed * (100.0 - ovr) / ovr) if ovr > 0.0 else 0
+
+                # Velocidad real entre esta muestra y la anterior. Antes se
+                # publicaba 0.0 fijo y la interfaz siempre decía "0.0 MB/s": el
+                # descargador sí contaba los bytes, solo que no los propagaba.
+                # Se conserva la última lectura válida para que un tick sin
+                # progreso de bytes (p. ej. mientras ffmpeg reempaqueta) no
+                # haga parpadear el medidor a cero.
+                if downloaded_bytes is not None:
+                    delta_t = now - last_speed["t"]
+                    delta_b = downloaded_bytes - last_speed["bytes"]
+                    if delta_b < 0:  # pista nueva: el contador arranca de cero
+                        delta_b = downloaded_bytes
+                    if delta_t >= 0.25 and delta_b > 0:
+                        last_speed["mbps"] = round(delta_b / delta_t / 1_000_000, 2)
+                        last_speed["t"] = now
+                        last_speed["bytes"] = downloaded_bytes
                 asyncio.run_coroutine_threadsafe(
                     rc.publish_progress(
                         redis,
@@ -253,7 +273,7 @@ async def _process_job(
                             "completed_tracks": n_done,
                             "total_tracks": total,
                             "current_track_filename": name,
-                            "speed_mbps": 0.0,
+                            "speed_mbps": last_speed["mbps"],
                             "eta_seconds": eta,
                             "user_id": user_id,
                         },

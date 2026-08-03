@@ -33,6 +33,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from app.core import user_session as us
 from app.core.logging_config import get_logger
@@ -63,10 +64,20 @@ class EngineRegistry:
     """Caché de motores Tidal por (usuario, kind) con evicción LRU/TTL y limpieza de temp."""
 
     def __init__(
-        self, max_engines: int = 50, idle_ttl: int = 1800, auth_recheck_interval: int = 60
+        self,
+        max_engines: int = 50,
+        idle_ttl: int = 1800,
+        auth_recheck_interval: int = 60,
+        download_dir: str = "",
     ) -> None:
         self.max_engines = max_engines
         self.idle_ttl = idle_ttl
+        # Carpeta persistente donde caen las descargas. Cada usuario tiene la suya
+        # dentro: la ruta no es una frontera de autorización (esa es
+        # `assert_job_owner`), pero evita que dos usuarios que bajan el mismo
+        # álbum se pisen los ficheros. Vacío = directorio temporal por motor,
+        # que es lo que había y borra la música al evictar.
+        self.download_dir = download_dir
         # `check_auth()` llama a `session.check_login()`, que es **una petición HTTP
         # a Tidal**. Como es una dependencia de todos los endpoints autenticados, se
         # pagaba una vez por petición: medido en 0.F, un suelo de ~130 ms incluso
@@ -92,7 +103,17 @@ class EngineRegistry:
             log_callback=lambda msg, _uid=uid: logger.debug("engine[%s]: %s", _uid, msg),
             session_data=tokens,
             is_pkce=(kind == "pkce"),
+            download_dir=self._user_download_dir(uid),
         )
+
+    def _user_download_dir(self, uid: str) -> str | None:
+        """Carpeta del usuario dentro de la de descargas, o None si no hay."""
+        if not self.download_dir:
+            return None
+        # `uid` viene de Tidal (numérico) o es sintético en pruebas; se sanea de
+        # todos modos porque acaba siendo un nombre de carpeta.
+        safe_uid = "".join(c for c in str(uid) if c.isalnum() or c in "-_") or "unknown"
+        return str(Path(self.download_dir) / safe_uid)
 
     async def get(self, redis, uid: str, kind: str = "oauth") -> TidalDownloader | None:
         """Devuelve el motor del usuario (creándolo si hace falta), o None sin tokens."""

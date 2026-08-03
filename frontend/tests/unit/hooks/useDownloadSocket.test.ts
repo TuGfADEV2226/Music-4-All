@@ -289,3 +289,74 @@ describe('useDownloadSocket', () => {
     })
   })
 })
+
+// ─── Volver a la pestaña reconecta al instante ────────────────────────────────
+//
+// En el móvil el navegador congela la página al pasar a segundo plano y el
+// socket muere. Antes solo había un reintento por temporizador con backoff
+// exponencial, así que al volver se podía esperar hasta 30 s — o para siempre,
+// porque a los 10 intentos `scheduleReconnect` se rendía en silencio y la
+// interfaz se quedaba en "Offline" hasta recargar.
+
+describe('useDownloadSocket — recuperación al volver a la pantalla', () => {
+  it('reconecta al instante al volver la visibilidad, sin esperar al backoff', () => {
+    vi.useFakeTimers()
+    renderHook(() => useDownloadSocket())
+    act(() => latestSocket().simulateOpen())
+    expect(instances).toHaveLength(1)
+
+    // El navegador mata el socket al mandar la pestaña a segundo plano.
+    act(() => latestSocket().simulateClose(1006))
+    expect(useDownloadsStore.getState().wsConnected).toBe(false)
+
+    // Al volver, sin dejar correr ningún temporizador, ya hay socket nuevo.
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(instances).toHaveLength(2)
+  })
+
+  it('reconecta al recuperar la red', () => {
+    vi.useFakeTimers()
+    renderHook(() => useDownloadSocket())
+    act(() => latestSocket().simulateOpen())
+    act(() => latestSocket().simulateClose(1006))
+
+    act(() => {
+      window.dispatchEvent(new Event('online'))
+    })
+    expect(instances).toHaveLength(2)
+  })
+
+  it('no abre un socket de más si ya está conectado', () => {
+    vi.useFakeTimers()
+    renderHook(() => useDownloadSocket())
+    act(() => latestSocket().simulateOpen())
+
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      window.dispatchEvent(new Event('online'))
+    })
+    expect(instances).toHaveLength(1)
+  })
+
+  it('se recupera aunque se hayan agotado los reintentos', () => {
+    vi.useFakeTimers()
+    renderHook(() => useDownloadSocket())
+    // 10 ciclos abrir→cerrar agotan MAX_ATTEMPTS sin que ninguno llegue a abrir.
+    act(() => latestSocket().simulateClose(1006))
+    for (let i = 0; i < 12; i++) {
+      act(() => vi.advanceTimersByTime(30_000))
+      const s = latestSocket()
+      if (s.readyState !== FakeWebSocket.CLOSED) act(() => s.simulateClose(1006))
+    }
+    const agotados = instances.length
+    act(() => vi.advanceTimersByTime(120_000))
+    expect(instances).toHaveLength(agotados) // se rindió: ya no reintenta solo
+
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(instances.length).toBeGreaterThan(agotados) // vuelve a la vida
+  })
+})

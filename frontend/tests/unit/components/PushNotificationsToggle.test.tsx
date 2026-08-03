@@ -59,10 +59,33 @@ describe('PushNotificationsToggle', () => {
     expect(disable).toHaveBeenCalledTimes(1)
   })
 
-  it('disables the switch and prompts to install when no service worker is ready', () => {
-    setHook({ swReady: false })
-    render(<PushNotificationsToggle />)
-    expect(screen.getByRole('switch', { name: /download notifications/i })).toBeDisabled()
-    expect(screen.getByText(/install the app/i)).toBeVisible()
+  describe('sin service worker listo', () => {
+    /** El mensaje depende de la plataforma: ver `unavailableHint`. */
+    function setUserAgent(ua: string) {
+      Object.defineProperty(window.navigator, 'userAgent', { value: ua, configurable: true })
+    }
+
+    it('deshabilita el interruptor', () => {
+      setHook({ swReady: false })
+      render(<PushNotificationsToggle />)
+      expect(screen.getByRole('switch', { name: /download notifications/i })).toBeDisabled()
+    })
+
+    it('en iOS pide añadir a la pantalla de inicio, que ahí sí es el requisito', () => {
+      setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15')
+      setHook({ swReady: false })
+      render(<PushNotificationsToggle />)
+      expect(screen.getByText(/add music 4 all to your home screen/i)).toBeVisible()
+    })
+
+    it('en Android NO pide instalar nada — ahí el push funciona en la pestaña', () => {
+      // El mensaje anterior mandaba instalar la app a todo el mundo, y en
+      // Android eso no arregla nada: lo que falta es el service worker.
+      setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120')
+      setHook({ swReady: false })
+      render(<PushNotificationsToggle />)
+      expect(screen.queryByText(/home screen/i)).not.toBeInTheDocument()
+      expect(screen.getByText(/not available in this session/i)).toBeVisible()
+    })
   })
 })

@@ -17,10 +17,11 @@ class FakeEngine:
 
     instances: list[FakeEngine] = []
 
-    def __init__(self, log_callback=None, session_data=None, is_pkce=False):
+    def __init__(self, log_callback=None, session_data=None, is_pkce=False, download_dir=None):
         self.session_data = session_data or {}
         self.session = SimpleNamespace(access_token=self.session_data.get("access_token"))
         self.is_pkce = is_pkce
+        self.download_dir = download_dir
         self.cleaned = False
         self._auth_ok = True
         self._refresh_to: str | None = None
@@ -259,3 +260,51 @@ async def test_failed_auth_is_not_cached(redis, counting_engine):
     assert await reg.get_authenticated(redis, "u_dead") is None
     assert await reg.get_authenticated(redis, "u_dead") is None
     assert engine.auth_calls == 2  # se reintenta, no se da por buena
+
+
+# ── Carpeta de descargas persistente ──────────────────────────────────────────
+# Sin `download_dir` los ficheros caían en un temporal por motor que se borra al
+# evictarlo: la música desaparecía sola a los 30 min de inactividad y engordaba
+# el disco del contenedor en vez del volumen montado (4,2 GB medidos en una sola
+# sesión de pruebas, con la carpeta montada vacía).
+
+
+async def test_engine_gets_a_per_user_download_dir(redis, tmp_path):
+    await _store(redis, "u_dir")
+    reg = er.EngineRegistry(download_dir=str(tmp_path))
+
+    engine = await reg.get(redis, "u_dir")
+
+    assert engine.download_dir == str(tmp_path / "u_dir")
+
+
+async def test_each_user_gets_its_own_folder(redis, tmp_path):
+    # Dos usuarios bajando el mismo álbum no deben pisarse los ficheros.
+    await _store(redis, "userA")
+    await _store(redis, "userB")
+    reg = er.EngineRegistry(download_dir=str(tmp_path))
+
+    a = await reg.get(redis, "userA")
+    b = await reg.get(redis, "userB")
+
+    assert a.download_dir != b.download_dir
+
+
+async def test_user_id_is_sanitised_into_the_path(redis, tmp_path):
+    # El uid acaba siendo un nombre de carpeta: no debe poder salirse de ella.
+    await _store(redis, "../../etc")
+    reg = er.EngineRegistry(download_dir=str(tmp_path))
+
+    engine = await reg.get(redis, "../../etc")
+
+    assert ".." not in engine.download_dir
+    assert engine.download_dir.startswith(str(tmp_path))
+
+
+async def test_without_config_the_engine_keeps_its_temp_dir(redis):
+    await _store(redis, "u_tmp")
+    reg = er.EngineRegistry()
+
+    engine = await reg.get(redis, "u_tmp")
+
+    assert engine.download_dir is None

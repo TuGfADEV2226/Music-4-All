@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Pause, Play, X } from 'lucide-react'
+import { Download, Pause, Play, X } from 'lucide-react'
 
 import { cn } from '@/shared/lib/cn'
 import { formatDuration, formatSpeed } from '@/shared/lib/format'
@@ -115,6 +115,26 @@ export function DownloadJobItem({
 
         {/* Action buttons */}
         <div className="flex shrink-0 items-center gap-1">
+          {/* Guardar en el dispositivo. Es un <a> y no un botón a propósito: el
+              backend responde con Content-Disposition, así que el navegador se
+              encarga de la descarga (y del streaming del fichero, que puede
+              pesar cientos de MB). Sin esto la descarga terminaba en el
+              servidor y el usuario no tenía forma de obtener el archivo. */}
+          {isCompleted && (
+            <a
+              href={`/api/download/file/${job.backendJobId}`}
+              download
+              aria-label={`Save to your device: ${job.albumTitle}`}
+              className={cn(
+                'inline-flex h-7 w-7 items-center justify-center rounded-md',
+                'text-secondary transition-all duration-150 ease-out',
+                'hover:bg-surface-console hover:text-primary active:scale-[0.97]',
+                'focus-visible:outline-none focus-visible:shadow-glow-focus',
+              )}
+            >
+              <Download aria-hidden="true" className="h-4 w-4" />
+            </a>
+          )}
           {/* Play — only for a completed single-track download (albums are ZIPs) */}
           {isCompleted && job.totalTracks === 1 && onPlay && (
             <Button
