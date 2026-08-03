@@ -14,9 +14,44 @@ REDIS_ALL_JOBS_CHANNEL = "music4all:progress:all"
 HISTORY_MAX_SIZE = 200
 JOB_TTL = 86400  # 24 horas
 
+# Segundos que una petición espera a que se libere una conexión del pool de
+# comandos antes de rendirse. Acotado a propósito: sin tope, una saturación se
+# convertiría en peticiones colgadas en vez de en un error visible.
+POOL_WAIT_TIMEOUT = 10
 
-async def create_client(url: str) -> Redis:
-    return aioredis.from_url(url, decode_responses=True)
+
+async def create_client(
+    url: str, max_connections: int | None = None, block_when_full: bool = False
+) -> Redis:
+    """Cliente Redis con el tamaño del pool declarado explícitamente.
+
+    `max_connections` no se deja al criterio de la librería: redis-py 8 lo bajó a
+    100 (antes era prácticamente ilimitado), y como cada WebSocket de progreso
+    retiene una conexión mientras está abierto, ese cambio convirtió "muchos
+    usuarios con la pestaña abierta" en un fallo total de la API. Ver
+    `settings.redis_max_connections` / `ws_max_connections`.
+
+    `block_when_full` elige qué pasa cuando el pool se queda sin conexiones:
+
+    - `False` (pool normal): la petición falla en el acto con
+      `MaxConnectionsError`. Es lo que se quiere para las suscripciones de los
+      WebSocket, donde el rechazo es la respuesta correcta (y ya hay aforo).
+    - `True` (pool bloqueante): la petición **espera** a que se libere una. Es lo
+      que se quiere para los comandos: una ráfaga de peticiones simultáneas mayor
+      que el pool debe costar latencia, no un 500. Medido en 0.F: 120 handshakes
+      a la vez agotaban un pool de 100 y cuatro se caían con 500.
+    """
+    if max_connections is None:
+        return aioredis.from_url(url, decode_responses=True)
+    if not block_when_full:
+        return aioredis.from_url(url, decode_responses=True, max_connections=max_connections)
+    pool = aioredis.BlockingConnectionPool.from_url(
+        url,
+        decode_responses=True,
+        max_connections=max_connections,
+        timeout=POOL_WAIT_TIMEOUT,
+    )
+    return aioredis.Redis(connection_pool=pool)
 
 
 # ─── Session ──────────────────────────────────────────────────────────────────

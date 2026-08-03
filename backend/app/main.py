@@ -72,13 +72,26 @@ async def lifespan(app: FastAPI):
     # que faltan y **nunca altera las existentes**: las bases ya desplegadas se
     # quedaban sin las columnas nuevas y el arranque no se enteraba.
 
-    app.state.redis = await rc.create_client(settings.redis_url)
+    app.state.redis = await rc.create_client(
+        settings.redis_url,
+        max_connections=settings.redis_max_connections,
+        # Una ráfaga de peticiones mayor que el pool debe costar latencia, no 500.
+        block_when_full=True,
+    )
+    # Pool aparte para las suscripciones Pub/Sub de los WebSocket. Cada WS retiene
+    # su conexión mientras esté abierto; compartiendo pool con los comandos, una
+    # sala llena agotaba el pool y **toda** la API pasaba a responder 500 (medido
+    # en 0.F). Separados, el peor caso de los WS es rechazar WS nuevos.
+    app.state.redis_pubsub = await rc.create_client(
+        settings.redis_url, max_connections=settings.ws_max_connections
+    )
 
     # Motor Tidal por usuario (multiusuario). El motor global se mantiene solo para
     # los routers legacy (`/auth/*`) y como fallback de auth del WS sin cookie.
     app.state.engine_registry = EngineRegistry(
         max_engines=settings.max_user_engines,
         idle_ttl=settings.engine_idle_ttl,
+        auth_recheck_interval=settings.engine_auth_recheck_interval,
     )
     session_data = await rc.load_session(app.state.redis)
     app.state.engine = TidalDownloader(session_data=session_data)
@@ -110,6 +123,7 @@ async def lifespan(app: FastAPI):
 
     await app.state.engine_registry.cleanup_all()
     await app.state.redis.aclose()
+    await app.state.redis_pubsub.aclose()
     await engine.dispose()
     app.state.engine._cleanup_temp_dir()
 

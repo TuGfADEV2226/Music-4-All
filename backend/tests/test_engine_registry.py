@@ -187,3 +187,75 @@ async def test_pkce_engine_none_without_pkce_tokens(redis):
     reg = er.EngineRegistry()
     assert await reg.get(redis, "only_oauth", "pkce") is None
     assert await reg.acquire(redis, "only_oauth", "pkce") is None
+
+
+# ── Revalidación de sesión: no una llamada a Tidal por petición ───────────────
+# `check_auth()` es `session.check_login()`, o sea una petición HTTP a Tidal, y
+# es dependencia de todos los endpoints autenticados. Medido en la Fase 0.F:
+# ~130 ms de suelo por petición aunque la respuesta saliera de la caché, y una
+# llamada al client_id compartido por cada vista.
+
+
+class CountingEngine(FakeEngine):
+    """Cuenta cuántas veces se valida la sesión contra Tidal."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.auth_calls = 0
+
+    def check_auth(self) -> bool:
+        self.auth_calls += 1
+        return super().check_auth()
+
+
+@pytest.fixture
+def counting_engine(monkeypatch):
+    FakeEngine.instances = []
+    monkeypatch.setattr(er, "TidalDownloader", CountingEngine)
+    return FakeEngine.instances
+
+
+async def test_auth_is_not_rechecked_within_the_interval(redis, counting_engine):
+    await _store(redis, "u_recheck")
+    reg = er.EngineRegistry(auth_recheck_interval=60)
+
+    for _ in range(5):
+        assert await reg.get_authenticated(redis, "u_recheck") is not None
+
+    assert counting_engine[0].auth_calls == 1  # una sola vez, no cinco
+
+
+async def test_auth_is_rechecked_once_the_interval_passes(redis, counting_engine):
+    await _store(redis, "u_expire")
+    reg = er.EngineRegistry(auth_recheck_interval=60)
+
+    await reg.get_authenticated(redis, "u_expire")
+    # Envejece la marca de la última validación en lugar de esperar de verdad.
+    reg._engines["oauth:u_expire"].last_auth_check -= 61
+    await reg.get_authenticated(redis, "u_expire")
+
+    assert counting_engine[0].auth_calls == 2
+
+
+async def test_interval_zero_checks_every_time(redis, counting_engine):
+    """Escotilla de escape: con 0 se recupera el comportamiento anterior."""
+    await _store(redis, "u_always")
+    reg = er.EngineRegistry(auth_recheck_interval=0)
+
+    for _ in range(3):
+        await reg.get_authenticated(redis, "u_always")
+
+    assert counting_engine[0].auth_calls == 3
+
+
+async def test_failed_auth_is_not_cached(redis, counting_engine):
+    """Una sesión muerta no debe quedar validada durante el intervalo."""
+    await _store(redis, "u_dead")
+    reg = er.EngineRegistry(auth_recheck_interval=60)
+
+    engine = await reg.get(redis, "u_dead")
+    engine._auth_ok = False
+
+    assert await reg.get_authenticated(redis, "u_dead") is None
+    assert await reg.get_authenticated(redis, "u_dead") is None
+    assert engine.auth_calls == 2  # se reintenta, no se da por buena

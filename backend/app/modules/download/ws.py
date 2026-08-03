@@ -18,13 +18,55 @@ import anyio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.config import settings
-from app.core import bans
+from app.core import bans, metrics
 from app.core import redis_client as rc
 from app.core import user_session as us
 from app.core.tidal import TidalDownloader
 from app.modules.download.ws_mapper import flat_to_spec_message
 
 router = APIRouter(prefix="/ws", tags=["websocket"])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Aforo de WebSockets
+# ─────────────────────────────────────────────────────────────────────────────
+# Cada conexión mantiene abierta una suscripción Pub/Sub, es decir **una conexión
+# de Redis retenida mientras el usuario tenga la pestaña abierta** (PERF-02: hoy
+# no hay fan-out compartido). Sin aforo, al agotarse el pool las conexiones
+# nuevas morían con un 500 del handshake — y, cuando el Pub/Sub compartía pool
+# con los comandos, se llevaba por delante toda la API. El aforo convierte eso en
+# un rechazo explícito: se cierra con 1013 (Try Again Later), que es lo que el
+# cliente sabe reintentar.
+
+_ws_connections = 0
+
+
+def _acquire_slot() -> bool:
+    """Reserva un hueco de conexión. False si el aforo está completo."""
+    global _ws_connections
+    if _ws_connections >= settings.ws_max_connections:
+        return False
+    _ws_connections += 1
+    metrics.ws_connections_active.set(_ws_connections)
+    return True
+
+
+def _release_slot() -> None:
+    global _ws_connections
+    _ws_connections = max(0, _ws_connections - 1)
+    metrics.ws_connections_active.set(_ws_connections)
+
+
+async def _reject_full(websocket: WebSocket) -> None:
+    metrics.ws_connections_rejected_total.inc()
+    await websocket.accept()
+    await websocket.close(code=1013, reason="Server at capacity — try again later")
+
+
+def _pubsub_client(websocket: WebSocket):
+    """Cliente Redis para suscripciones. Cae al principal si no está montado
+    (tests que construyen `app.state` a mano)."""
+    return getattr(websocket.app.state, "redis_pubsub", None) or websocket.app.state.redis
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -39,6 +81,10 @@ async def websocket_progress(websocket: WebSocket, job_id: str) -> None:
     Suscribe al canal Redis del job y retransmite mensajes flat sin transformar.
     NO aplica autenticación — mantener para compatibilidad.
     """
+    if not _acquire_slot():
+        await _reject_full(websocket)
+        return
+
     await websocket.accept()
     redis = websocket.app.state.redis
     channel = rc.progress_channel(job_id)
@@ -49,9 +95,12 @@ async def websocket_progress(websocket: WebSocket, job_id: str) -> None:
         await websocket.send_json(current)
         if current.get("status") in ("completed", "failed"):
             await websocket.close()
+            _release_slot()
             return
 
-    pubsub = redis.pubsub()
+    # Pool aparte: la suscripción vive lo que viva el WebSocket y no debe competir
+    # con los comandos de la API por el pool principal.
+    pubsub = _pubsub_client(websocket).pubsub()
     await pubsub.subscribe(channel)
 
     try:
@@ -73,6 +122,7 @@ async def websocket_progress(websocket: WebSocket, job_id: str) -> None:
             await websocket.close()
         except Exception:
             pass
+        _release_slot()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -102,33 +152,48 @@ async def websocket_downloads(websocket: WebSocket) -> None:
     """
     redis = websocket.app.state.redis  # type: ignore[attr-defined]
 
+    # ── Aforo: antes que nada, para no gastar Redis en un rechazo ─────────────
+    if not _acquire_slot():
+        await _reject_full(websocket)
+        return
+
     # ── Phase D: Validate session BEFORE accepting ────────────────────────────
     uid: str | None = None
     sid = websocket.cookies.get(settings.session_cookie_name)
-    if sid:
-        session_data = await us.get_app_session(redis, sid)
-        if not session_data:
-            await websocket.accept()
-            await websocket.close(code=1008, reason="Unauthorized — session expired or missing")
-            return
-        uid = str(session_data["tidal_user_id"])
-        # Gate de ban: un usuario baneado no recibe progreso de descargas.
-        if await bans.is_banned(redis, uid):
-            await websocket.accept()
-            await websocket.close(code=1008, reason="Forbidden — account banned")
-            return
-    else:
-        # Fallback legacy: sin cookie, usar el estado del motor global.
-        engine: TidalDownloader = websocket.app.state.engine  # type: ignore[attr-defined]
-        is_auth: bool = await asyncio.to_thread(engine.check_auth)
-        if not is_auth:
-            await websocket.accept()
-            await websocket.close(code=1008, reason="Unauthorized — session expired or missing")
-            return
+    try:
+        if sid:
+            session_data = await us.get_app_session(redis, sid)
+            if not session_data:
+                await websocket.accept()
+                await websocket.close(code=1008, reason="Unauthorized — session expired or missing")
+                _release_slot()
+                return
+            uid = str(session_data["tidal_user_id"])
+            # Gate de ban: un usuario baneado no recibe progreso de descargas.
+            if await bans.is_banned(redis, uid):
+                await websocket.accept()
+                await websocket.close(code=1008, reason="Forbidden — account banned")
+                _release_slot()
+                return
+        else:
+            # Fallback legacy: sin cookie, usar el estado del motor global.
+            engine: TidalDownloader = websocket.app.state.engine  # type: ignore[attr-defined]
+            is_auth: bool = await asyncio.to_thread(engine.check_auth)
+            if not is_auth:
+                await websocket.accept()
+                await websocket.close(code=1008, reason="Unauthorized — session expired or missing")
+                _release_slot()
+                return
+    except Exception:
+        # Cualquier fallo validando (Redis caído, etc.) no debe dejar el hueco
+        # ocupado para siempre: el aforo se quedaría lleno de conexiones fantasma.
+        _release_slot()
+        raise
 
     await websocket.accept()
 
-    pubsub = redis.pubsub()
+    # Pool aparte para la suscripción — ver la nota del aforo, arriba.
+    pubsub = _pubsub_client(websocket).pubsub()
     await pubsub.subscribe(rc.REDIS_ALL_JOBS_CHANNEL)
 
     # Serialises concurrent websocket.send_json() calls (relay vs main loop)
@@ -232,3 +297,4 @@ async def websocket_downloads(websocket: WebSocket) -> None:
                 await websocket.close()
             except Exception:
                 pass
+            _release_slot()

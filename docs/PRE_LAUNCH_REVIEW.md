@@ -11,7 +11,7 @@ Estado global de la suite:
 
 | Gate | Resultado |
 |---|---|
-| Backend `pytest` | 363 passed, 2 skipped |
+| Backend `pytest` | **373 passed**, 2 skipped (363 al cerrar 0.G, +10 en 0.F) |
 | Backend `ruff check` + `format --check` | limpio |
 | Backend `pip-audit` | **0 vulnerabilidades conocidas** |
 | Frontend `pnpm test` (Vitest) | **240 passed** (175 al cerrar 0.G, +65 en 0.D) |
@@ -293,7 +293,140 @@ móvil y consola limpia — ya está cubierto arriba y corre en CI.
 
 ## 0.F — Estrés y capacidad
 
-**Pendiente.**
+El load test que había **no medía nada**: `AuthenticatedUser` no tenía sesión
+(`on_start: pass`), así que sus peticiones devolvían 401, y golpeaba rutas legacy
+(`/metadata/search`, `/auth/status`) que el frontend ya no usa. Reescrito y
+ampliado con descargas y WebSocket. Herramientas nuevas en `backend/tests/load/`:
+
+| Archivo | Para qué |
+|---|---|
+| `seed_sessions.py` | Siembra N sesiones de app válidas en Redis (usuarios `loadtest-N` con una copia de los tokens Tidal de una cuenta real). Sin esto no se puede medir nada autenticado. `--purge` / `--purge-db` lo limpian todo |
+| `locustfile.py` | Campaña sobre la API v2 real, con sesión por usuario simulado |
+| `ws_load.py` | Abre N WebSockets a la vez y mide el coste en conexiones de Redis (PERF-02) |
+
+**Cómo se acota el riesgo del `client_id` compartido**: la búsqueda usa un
+conjunto **fijo y pequeño** de consultas, así que la carga golpea la caché de
+Redis (Fase 4) y no a Tidal; y las descargas se encolan y se **cancelan** acto
+seguido, salvo que se pida lo contrario con `LOADTEST_KEEP_DOWNLOADS=1`.
+
+### Dos fallos serios encontrados al medir — CORREGIDOS
+
+#### 1. Con ~100 usuarios conectados, **toda la API devolvía 500**
+
+Cada WebSocket de progreso mantiene una suscripción Pub/Sub, es decir **una
+conexión de Redis retenida mientras el usuario tenga la pestaña abierta**. Salía
+del mismo pool que los comandos, y **redis-py 8 bajó el tamaño por defecto del
+pool a 100** (antes era prácticamente ilimitado). Consecuencia medida con 120
+conexiones:
+
+```
+/health          -> HTTP 200   (no toca Redis)
+/session/status  -> HTTP 500   MaxConnectionsError: Too many connections
+/history         -> HTTP 500
+```
+
+No era "el WebSocket número 101 falla": eran **~100 usuarios con la pestaña
+abierta dejando la aplicación entera inservible**, sin tocar una sola descarga.
+Es un bloqueante de lanzamiento y no lo habría visto ningún test unitario.
+
+Tres cambios, cada uno con su motivo:
+
+- **Pool separado para Pub/Sub** (`app.state.redis_pubsub`): las suscripciones
+  largas ya no compiten con los comandos. El peor caso de los WebSocket pasa a
+  ser rechazar WebSocket nuevos.
+- **Aforo explícito** (`ws_max_connections`, 200): al llenarse se cierra con
+  **1013 (Try Again Later)**, que es lo que un cliente sabe reintentar, en vez de
+  reventar el handshake con un 500. Métricas `ws_connections_active` y
+  `ws_connections_rejected_total`.
+- **Pool de comandos bloqueante**: una ráfaga de peticiones simultáneas mayor que
+  el pool ahora **espera** (con tope de 10 s) en vez de fallar. Sin esto, 120
+  handshakes a la vez seguían tirando cuatro con 500.
+
+Verificado con la misma prueba que lo destapó — 250 conexiones contra un aforo de
+200:
+
+```
+200 abiertos · 50 rechazados por aforo (1013) · 0 fallidos
+/health 200 · /session/status 200 · /history 200 · /history/stats 200
+```
+
+**PERF-02 cuantificado**: exactamente **1.00 conexiones de Redis por WebSocket**
+(101 → 301 con 200 abiertos), y al cerrar vuelven a 101 → **no hay fuga**. El
+fan-out compartido sigue diferido, pero ahora el coste está medido y acotado.
+
+#### 2. Una llamada a Tidal **por cada petición autenticada**
+
+`get_authenticated_engine` es dependencia de todos los endpoints con sesión y
+llamaba a `check_auth()` → `session.check_login()`, que es **una petición HTTP a
+Tidal**. Se veía como un suelo constante de ~130 ms en todo endpoint con sesión
+*aunque la respuesta viniera de la caché de Redis*, y significaba una llamada al
+`client_id` compartido por cada vista — justo lo que la caché de la Fase 4 existe
+para evitar.
+
+Se revalida como mucho una vez cada `engine_auth_recheck_interval` segundos (60)
+por motor. Una sesión revocada se sigue detectando: el fallo aparece igual como
+401 de la petición siguiente. `0` restaura el comportamiento anterior.
+
+| p50 | antes | después |
+|---|---|---|
+| `/search` (cacheada) | 130 ms | **6 ms** |
+| `/albums/{id}` | 130 ms | **5 ms** |
+| `/artists/{id}` | 130 ms | **6 ms** |
+| `/session/status` | 130 ms | **5 ms** |
+| `POST /downloads` | 250 ms | **110 ms** |
+| `DELETE /downloads/{id}` | 240 ms | **47 ms** |
+| **Agregado** | **130 ms** | **6 ms** |
+
+### Cifras medidas (stack de desarrollo, Docker local)
+
+Campaña de 30 usuarios concurrentes, 90 s: **805 peticiones, 0 fallos (0.00 %)**,
+9 req/s, **p50 6 ms / p95 110 ms**.
+
+| Camino | Medida |
+|---|---|
+| `/health` | p50 4 ms |
+| `/history`, `/history/stats` | p50 6-8 ms |
+| `/search` con caché caliente | p50 6 ms |
+| Descarga real de 1 pista (NORMAL/AAC) | **6 s** extremo a extremo |
+| Descarga real de 1 pista (MASTER/hi-res) | **8 s**, **pico de CPU 90 %** de un núcleo |
+| WebSockets simultáneos | **200** (aforo), 1.00 conexiones de Redis cada uno |
+| RAM del backend con 200 WS | 222 MiB (≈60 kB por conexión) |
+| RAM de Valkey con 200 WS | 11 MiB |
+
+### Objetivos de capacidad (VM gratuita Ampere A1, 4 OCPU / 24 GB)
+
+Se fijan a partir de lo medido, no a ojo:
+
+| Objetivo | Valor | De dónde sale |
+|---|---|---|
+| Usuarios con la app abierta a la vez | **200** | Aforo de WS; por encima se rechaza con 1013, sin degradar al resto |
+| Descargas simultáneas | **3** (`max_concurrent_downloads`) | Una descarga hi-res satura ~1 núcleo; 3 dejan uno libre para la API |
+| Ritmo de descarga sostenible | ~**22 pistas/min** hi-res | 8 s por pista × 3 en paralelo |
+| Peticiones de navegación | ≥ 9 req/s con p95 < 150 ms | Medido a 30 usuarios sin un solo fallo |
+| Techo por usuario | 3 concurrentes / 50 al día | Cuotas ya existentes; se comprobó que el 429 aparece y **no** se contabiliza como error |
+
+El límite real no es la máquina: son las **cuotas por usuario** y el `client_id`
+compartido de Tidal. Con 200 usuarios conectados el backend gasta 222 MiB y la
+CPU se va en las descargas, no en servir la API.
+
+### Notas de método
+
+- El primer intento medía **el propio medidor**: aiohttp limita a 100 conexiones
+  simultáneas por defecto, así que aparecía un techo de ~100 WebSockets que era
+  del cliente. Con `TCPConnector(limit=0)` sale el techo real del servidor.
+- Los IDs de álbum/artista del fixture de los e2e son **inventados**: con ellos
+  la campaña medía el camino de error (404 y 500). Se usan IDs reales de Tidal.
+- Si a mitad de una campaña empiezan a salir 401, hay que **volver a sembrar**:
+  las sesiones tienen TTL de inactividad y, en Docker Desktop, un suspender/
+  reanudar del portátil salta el reloj del contenedor y expira de golpe todas las
+  claves con TTL. Se comprobó que el TTL en sí baja con normalidad (1800 → 1708
+  en 90 s): no es un fallo del producto.
+
+### Pendiente de 0.F
+
+**0.F.1 — prueba con otra persona por túnel** (Cloudflare Tunnel a `nginx:80`,
+quitando `NEXT_PUBLIC_WS_URL` para que el WebSocket vaya same-origin). Requiere a
+un tester con su propia cuenta Tidal.
 
 ---
 

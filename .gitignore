@@ -93,3 +93,7 @@ frontend/blob-report/
 
 # Binario pesado de la version monolitica previa (solo referencia local)
 /_old/ffmpeg.exe
+
+# Pruebas de carga — el fichero de sids son identificadores de sesion validos
+# (equivalen a estar logueado). Se generan con backend/tests/load/seed_sessions.py.
+loadtest_sids.txt

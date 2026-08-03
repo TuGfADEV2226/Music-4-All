@@ -26,11 +26,28 @@ class Settings(BaseSettings):
     cookie_secure: bool = False  # True en producción (cookies solo por HTTPS)
     cookie_samesite: str = "lax"  # Lax: cookie viaja en navegaciones top-level (middleware)
 
+    # Conexiones a Redis. Se declaran explícitamente porque el valor por defecto de
+    # la librería cambió bajo nuestros pies: redis-py 8 limita el pool a 100
+    # conexiones (antes era prácticamente ilimitado). Cada WebSocket de progreso
+    # retiene una conexión del pool mientras esté abierto, así que con el pool
+    # único que había, ~100 usuarios con la pestaña abierta lo agotaban y **toda**
+    # la API empezaba a devolver 500 (medido en la Fase 0.F). De ahí los dos pools:
+    #   - redis_max_connections: comandos (sesión, cuotas, jobs, caché).
+    #   - ws_max_connections: suscripciones Pub/Sub de los WebSocket, en su propio
+    #     cliente, para que una sala llena nunca pueda tumbar el resto de la API.
+    redis_max_connections: int = 100
+    ws_max_connections: int = 200
+
     # EngineRegistry (multiusuario) — un motor Tidal por usuario, con caché LRU/TTL.
     # max_user_engines acota la memoria/temp dirs; engine_idle_ttl evicta motores
     # ociosos (sin descargas en curso) para liberar su directorio temporal.
     max_user_engines: int = 50
     engine_idle_ttl: int = 1800  # 30 min sin uso → evicción
+    # Cada validación de sesión es una petición HTTP a Tidal, y era una por cada
+    # petición autenticada: ~130 ms de suelo aunque la respuesta viniera de caché,
+    # y una llamada al client_id compartido por vista. Se revalida como mucho una
+    # vez cada N segundos por motor. 0 = validar siempre (comportamiento anterior).
+    engine_auth_recheck_interval: int = 60
 
     # Caché de catálogo Tidal (Fase 4) — búsqueda/metadata/detalle. Es la red de
     # seguridad del client_id compartido: las lecturas del catálogo son globales

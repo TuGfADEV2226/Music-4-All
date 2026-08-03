@@ -51,6 +51,9 @@ class _Entry:
     engine: TidalDownloader
     last_access: float = field(default_factory=time.monotonic)
     refcount: int = 0
+    # Momento de la última validación **contra Tidal** (0 = nunca). Ver
+    # `EngineRegistry.auth_recheck_interval`.
+    last_auth_check: float = 0.0
 
     def touch(self) -> None:
         self.last_access = time.monotonic()
@@ -59,9 +62,20 @@ class _Entry:
 class EngineRegistry:
     """Caché de motores Tidal por (usuario, kind) con evicción LRU/TTL y limpieza de temp."""
 
-    def __init__(self, max_engines: int = 50, idle_ttl: int = 1800) -> None:
+    def __init__(
+        self, max_engines: int = 50, idle_ttl: int = 1800, auth_recheck_interval: int = 60
+    ) -> None:
         self.max_engines = max_engines
         self.idle_ttl = idle_ttl
+        # `check_auth()` llama a `session.check_login()`, que es **una petición HTTP
+        # a Tidal**. Como es una dependencia de todos los endpoints autenticados, se
+        # pagaba una vez por petición: medido en 0.F, un suelo de ~130 ms incluso
+        # cuando la respuesta salía de la caché de Redis, y —peor— una llamada al
+        # `client_id` compartido por cada vista, justo lo que la caché de la Fase 4
+        # existe para evitar. Revalidar cada N segundos por motor mantiene la
+        # detección de sesiones muertas (el fallo real sale igual como 401 de la
+        # petición siguiente) sin repetir el viaje. 0 = comportamiento anterior.
+        self.auth_recheck_interval = auth_recheck_interval
         self._engines: dict[str, _Entry] = {}
         self._lock = asyncio.Lock()
 
@@ -118,6 +132,15 @@ class EngineRegistry:
         if engine is None:
             return None
 
+        # Validación reciente → se ahorra el viaje a Tidal (ver auth_recheck_interval).
+        ck = _cache_key(uid, kind)
+        now = time.monotonic()
+        if self.auth_recheck_interval > 0:
+            async with self._lock:
+                entry = self._engines.get(ck)
+                if entry is not None and now - entry.last_auth_check < self.auth_recheck_interval:
+                    return engine
+
         token_before = getattr(engine.session, "access_token", None)
         ok = await asyncio.to_thread(engine.check_auth)
         if not ok:
@@ -126,6 +149,11 @@ class EngineRegistry:
         if token_after and token_after != token_before:
             token_data = us.token_data_from_session(engine.session)
             await us.store_user_tokens(redis, uid, kind, token_data)
+
+        async with self._lock:
+            entry = self._engines.get(ck)
+            if entry is not None:
+                entry.last_auth_check = time.monotonic()
         return engine
 
     # ── Fijado (worker) ──────────────────────────────────────────────────────

@@ -2,6 +2,17 @@
 
 > **AVISO — Auditoría histórica.** Es una foto de un estado anterior del repo; varios hallazgos pueden estar ya resueltos. Verificar cada uno contra el estado actual antes de accionar. Estado vigente en `docs/roadmap.md`.
 
+> **PERF-02 MEDIDO Y ACOTADO (2026-08-02, Fase 0.F).** Ya no es una estimación:
+> es **1.00 conexión de Redis por WebSocket**, y con el pool único que había
+> **~100 usuarios con la pestaña abierta dejaban toda la API en 500**
+> (`MaxConnectionsError`; redis-py 8 bajó el pool por defecto a 100). Resuelto con
+> pool separado para Pub/Sub, aforo explícito (`ws_max_connections`, rechazo con
+> 1013) y pool de comandos bloqueante. El fan-out compartido sigue diferido, pero
+> el coste está medido y el fallo ya no es catastrófico. También se corrigió **una
+> llamada a Tidal por cada petición autenticada** (p50 agregado 130 ms → 6 ms).
+> Cifras y objetivos de capacidad en [`docs/PRE_LAUNCH_REVIEW.md`](../PRE_LAUNCH_REVIEW.md) §0.F.
+> Con esto, el "**no existen datos de carga real**" del párrafo de abajo **ya no aplica**.
+
 > **Estado de vigencia — revisado 2026-07-02.** Documento puntual (~jun-2026). Sus hallazgos son de backend/infra (OTel síncrono, Redis Pub/Sub por WS, sin límites Docker, sin caché, load testing incompleto) que **no se modificaron** desde la redacción; se consideran **vigentes**. Nota: **PERF-06** cita `AudioWaves` como componente futuro — aún **no existe** en el código. Verificar contra el código actual antes de accionar.
 
 > Auditoría de rendimiento de backend (FastAPI/asyncio, PostgreSQL, Redis/Valkey, WebSockets, descargas/ffmpeg) y frontend (Next.js). Basada en lectura directa de código y configuración. **No existen datos de carga real** (sin métricas de producción, sin resultados documentados de `locustfile.py`) — todas las cifras de capacidad se marcan explícitamente como `[Estimación]` o `[NO VERIFICABLE]`. Complementa [`docs/operations/MONITORING.md`](../operations/MONITORING.md) (qué se mide hoy) y [`TECHNICAL_AUDIT.md`](TECHNICAL_AUDIT.md).

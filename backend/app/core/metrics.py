@@ -104,3 +104,19 @@ tidal_api_errors_total = Counter(
     "Errores de la API de Tidal relevantes para el client_id compartido",
     ["kind"],  # rate_limited (429, abre el circuit breaker) | auth (401)
 )
+
+# ── WebSocket de progreso (Fase 0.F) ──────────────────────────────────────────
+# Cada conexión retiene una conexión Pub/Sub de Redis mientras esté abierta, así
+# que es una capacidad acotada y hay que poder verla: `ws_connections_active`
+# contra `settings.ws_max_connections` dice cuánto margen queda, y un
+# `ws_connections_rejected_total` creciendo significa que la sala está llena.
+
+ws_connections_active = Gauge(
+    "music4all_ws_connections_active",
+    "WebSockets de progreso abiertos en este momento",
+)
+
+ws_connections_rejected_total = Counter(
+    "music4all_ws_connections_rejected_total",
+    "WebSockets rechazados por haberse alcanzado el máximo de conexiones",
+)
