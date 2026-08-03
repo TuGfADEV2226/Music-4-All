@@ -422,11 +422,70 @@ CPU se va en las descargas, no en servir la API.
   claves con TTL. Se comprobó que el TTL en sí baja con normalidad (1800 → 1708
   en 90 s): no es un fallo del producto.
 
-### Pendiente de 0.F
+### 0.F.1 — Acceso remoto por túnel — CAMINO TÉCNICO VERIFICADO
 
-**0.F.1 — prueba con otra persona por túnel** (Cloudflare Tunnel a `nginx:80`,
-quitando `NEXT_PUBLIC_WS_URL` para que el WebSocket vaya same-origin). Requiere a
-un tester con su propia cuenta Tidal.
+El [MUST] de este ítem era **arreglar el WebSocket para acceso remoto**, y el
+fallo era peor de lo que decía el plan. `NEXT_PUBLIC_WS_URL=ws://localhost:8000`
+existe porque el dev-server de Next crashea al proxear el upgrade del WebSocket,
+pero **se aplicaba siempre**: para cualquier visitante que no esté en esa máquina
+apunta a *su* localhost. El síntoma no es un error — es que **la descarga se
+queda eternamente "en cola"**, sin nada en consola que lo explique.
+
+Ahora el override solo vale si la página se sirve desde `localhost`/`127.0.0.1`;
+desde cualquier otro host se usa same-origin (`wss://<host>/ws/downloads`), que
+es lo que nginx ya proxea. Arregla tres casos que estaban rotos: el túnel, probar
+desde el móvil contra la IP de la LAN, y un despliegue donde la variable se
+colara por descuido.
+
+**Verificado en vivo** (`cloudflared tunnel --url http://localhost:80`, HTTPS
+real, navegador de verdad):
+
+| Comprobación | Resultado |
+|---|---|
+| Login y navegación por el túnel | OK |
+| `/api/*` same-origin a través de nginx | 200 |
+| WebSocket | `wss://<túnel>/ws/downloads` **abierto** |
+| Descarga real de una pista | 101 mensajes de `progress` + `job_completed` |
+| Fichero servido al dispositivo | 200, `audio/mp4`, **19.6 MB**, `Accept-Ranges: bytes` |
+| Errores de consola | 0 |
+
+Antes del túnel se comprobó lo mismo contra la IP de LAN: la app abre
+`ws://192.168.1.41/ws/downloads` **aunque la variable siga puesta** en el
+contenedor. 8 tests de `buildWsUrl` fijan el comportamiento.
+
+**Lo que queda es la parte humana**: que otra persona entre con **su propia
+cuenta Tidal** y use la app. Condiciones: el PC y Docker encendidos, grupo
+pequeño (cada usuario golpea el `client_id` compartido), y la URL muere al cerrar
+el túnel.
+
+**Nota sobre dónde acaba el fichero**: el `output_path` de una descarga apunta al
+directorio temporal del motor Tidal (`/tmp/tidal_dl_xxxx/…`), que se borra cuando
+el motor se evicta (`engine_idle_ttl`, 30 min sin uso). Para un tester remoto
+está bien —descarga y se lo lleva—, pero conviene saber que **no es
+almacenamiento duradero**: si tarda en pulsar "descargar", el fichero puede haber
+desaparecido.
+
+### Cloudflare Tunnel como ingreso permanente — evaluado, NO para producción
+
+Es ideal para esta prueba temporal, y como ingreso de producción tiene un
+atractivo real: **cero puertos abiertos** en la VM (resolvería SEC-03 de raíz),
+TLS gestionado sin Let's Encrypt, IP de origen oculta y WebSocket soportado
+(comprobado aquí). Pero dos cosas lo descartan hoy:
+
+1. **No es compatible con el plan $0.** Un túnel *con nombre* (permanente) exige
+   un dominio cuyos **nameservers estén en Cloudflare**. DuckDNS no sirve: no se
+   controlan sus NS. Habría que comprar un dominio. El túnel *quick*
+   (`trycloudflare.com`) no vale para producción: la URL es aleatoria y **cambia
+   en cada arranque**.
+2. **Riesgo de política, y apunta justo a lo que hace esta app.** El plan gratuito
+   de Cloudflare restringe usar su CDN para servir de forma desproporcionada
+   contenido que no sea HTML — vídeo y **audio** explícitamente. Aquí el producto
+   *es* servir ficheros FLAC de decenas de MB. Es un riesgo de cuenta, no
+   técnico, y depende del volumen; a escala pequeña rara vez se aplica, pero no
+   es un detalle que convenga ignorar en el ingreso principal de un servicio.
+
+**Decisión**: se mantiene el plan (Oracle + DuckDNS + Let's Encrypt, puertos
+cerrados con Security List/ufw). El túnel se queda como herramienta de prueba.
 
 ---
 
